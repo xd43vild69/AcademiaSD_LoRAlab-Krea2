@@ -1,0 +1,11 @@
+{
+  "model_id": "Krea-2-NF4",
+  "dataset_path": "./dataset",
+  "target_area": 262144,
+  "max_side": 1280,
+  "multiple": 16,
+  "max_seq_len": 128,
+  "project_name": "mi_proyecto",
+  "trigger_word": "",
+  "hf_token": ""
+}

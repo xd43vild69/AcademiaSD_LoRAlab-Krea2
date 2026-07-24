@@ -144,12 +144,15 @@ def ensure_model_downloaded(local_path, repo_id):
             "  pip install huggingface_hub"
         )
 
-    downloaded_path = snapshot_download(
-        repo_id=repo_id,
-        local_dir=local_path,
-        local_dir_use_symlinks=False,
-        resume_download=True,
-    )
+    hf_token = cfg.get("hf_token") or os.environ.get("HF_TOKEN")
+    dl_kwargs = {
+        "repo_id": repo_id,
+        "local_dir": local_path,
+    }
+    if hf_token:
+        dl_kwargs["token"] = hf_token
+
+    downloaded_path = snapshot_download(**dl_kwargs)
 
     print(f"[OK] Model downloaded to / Modelo descargado en: {downloaded_path}")
     return downloaded_path
@@ -527,7 +530,7 @@ def train_krea2():
     cache_data, buckets = {}, defaultdict(list)
 
     for f in os.listdir(CACHE_DIR):
-        if not f.endswith("_latent.pt"):
+        if f.startswith(".") or not f.endswith("_latent.pt"):
             continue
         nombre = f.replace("_latent.pt", "")
         lat  = torch.load(f"{CACHE_DIR}/{nombre}_latent.pt", weights_only=True)

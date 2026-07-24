@@ -189,6 +189,9 @@ def select_folder_native():
 
         selected_path = None
 
+        if os.name != "nt" and not os.environ.get("DISPLAY"):
+            return jsonify({"status": "not_supported", "path": None, "reason": "No GUI display available on server (SSH/headless)"})
+
         try:
             import tkinter as tk
             from tkinter import filedialog
@@ -207,7 +210,7 @@ def select_folder_native():
         except Exception:
             pass
 
-        if not selected_path:
+        if not selected_path and os.name == "nt":
             try:
                 ps_cmd = (
                     '[System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms") | Out-Null; '
@@ -215,7 +218,7 @@ def select_folder_native():
                     f'$dialog.SelectedPath = "{initial_dir}"; '
                     'if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $dialog.SelectedPath }'
                 )
-                creation_flag = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+                creation_flag = subprocess.CREATE_NO_WINDOW
                 output = subprocess.check_output(["powershell", "-command", ps_cmd], text=True, errors="ignore", creationflags=creation_flag).strip()
                 if output:
                     selected_path = str(Path(output).resolve())
@@ -307,7 +310,7 @@ def browse_dir():
 
     image_count = 0
     try:
-        image_count = sum(1 for f in target.iterdir() if f.is_file() and f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"))
+        image_count = sum(1 for f in target.iterdir() if f.is_file() and not f.name.startswith(".") and f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"))
     except Exception:
         pass
 
@@ -672,7 +675,7 @@ def dataset_info():
     images = []
     if dataset_dir.is_dir():
         for file_path in sorted(dataset_dir.iterdir()):
-            if file_path.is_file() and file_path.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"):
+            if file_path.is_file() and not file_path.name.startswith(".") and file_path.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"):
                 txt_path = file_path.with_suffix(".txt")
                 caption = ""
                 if txt_path.exists():

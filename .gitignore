@@ -1,0 +1,81 @@
+# ==========================================
+# Entornos Virtuales de Python
+# ==========================================
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ==========================================
+# Modelos descargados, pesos y checkpoints
+# ==========================================
+Krea-2-NF4/
+*.safetensors
+*.bin
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.engine
+
+# ==========================================
+# Datasets y Cachés de datos procesados
+# ==========================================
+dataset/
+datasets/
+cached_data_krea2*/
+
+# ==========================================
+# Salidas de entrenamiento y Resultados (Outputs)
+# ==========================================
+krea2_lora_output*/
+output/
+outputs/
+samples/
+previews/
+
+# ==========================================
+# Configuraciones locales con datos/tokens privados
+# ==========================================
+pre_cache_settings.json
+train_settings.json
+
+# Excepciones: Mantener las plantillas de ejemplo
+!pre_cache_settings.json.example
+!train_settings.json.example
+
+# ==========================================
+# Archivos temporales, de respaldo y logs
+# ==========================================
+*.bak
+*.tmp
+*.log
+trainer_ui.html.bak
+trainer_ui.html_current
+temp_detector.py
+python-3.13.1-amd64.exe
+
+# ==========================================
+# Archivos compilados y Caché de Python
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# ==========================================
+# Sistema Operativo y Editor (OS / IDE)
+# ==========================================
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# IDEs y asistentes AI
+.vscode/
+.idea/
+.claude/

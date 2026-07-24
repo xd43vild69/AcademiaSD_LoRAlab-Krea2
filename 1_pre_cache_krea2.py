@@ -123,12 +123,15 @@ def ensure_model_downloaded(local_path, repo_id):
             "  pip install huggingface_hub"
         )
 
-    downloaded_path = snapshot_download(
-        repo_id=repo_id,
-        local_dir=local_path,
-        local_dir_use_symlinks=False,
-        resume_download=True,
-    )
+    hf_token = cfg.get("hf_token") or os.environ.get("HF_TOKEN")
+    dl_kwargs = {
+        "repo_id": repo_id,
+        "local_dir": local_path,
+    }
+    if hf_token:
+        dl_kwargs["token"] = hf_token
+
+    downloaded_path = snapshot_download(**dl_kwargs)
     print(f"✓ Model downloaded to / Modelo descargado en: {downloaded_path}")
     return downloaded_path
 
@@ -138,8 +141,16 @@ def preprocess_krea2():
         print(f"[!] Dataset folder does not exist / La carpeta del dataset no existe: {DATASET_PATH}")
         return
 
+    # Auto-limpieza de archivos fantasma ocultos de macOS (._* y .DS_Store)
+    for f in os.listdir(DATASET_PATH):
+        if f.startswith("._") or f == ".DS_Store":
+            try:
+                os.remove(os.path.join(DATASET_PATH, f))
+            except Exception:
+                pass
+
     archivos_img = sorted(f for f in os.listdir(DATASET_PATH)
-                          if f.lower().endswith((".png", ".jpg", ".jpeg", ".webp")))
+                          if not f.startswith(".") and f.lower().endswith((".png", ".jpg", ".jpeg", ".webp")))
     if not archivos_img:
         print(f"[!] No images found in '{DATASET_PATH}'. Please add images and optional .txt files. / No hay imágenes en '{DATASET_PATH}'. Añade imágenes y sus .txt opcionales.")
         return
@@ -176,7 +187,11 @@ def preprocess_krea2():
             print(f"[{idx}/{len(archivos_img)}] Processing / Procesando: {archivo}")
 
             # ── 1. IMAGEN → LATENTES (VAE) ──────────────────────────────────
-            img = Image.open(os.path.join(DATASET_PATH, archivo)).convert("RGB")
+            try:
+                img = Image.open(os.path.join(DATASET_PATH, archivo)).convert("RGB")
+            except Exception as err:
+                print(f"[!] Warning: Cannot open image / No se pudo abrir la imagen '{archivo}': {err}")
+                continue
             bw, bh = bucket_size(*img.size)
 
             ratio = max(bw / img.width, bh / img.height)

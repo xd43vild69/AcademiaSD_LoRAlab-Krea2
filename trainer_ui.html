@@ -642,7 +642,7 @@
                     } else if (target === 'export') {
                         document.getElementById('export_models_dir').value = data.path;
                     }
-                } else if (data.status === 'error') {
+                } else {
                     openFolderBrowserWeb(target, currentPath);
                 }
             } catch (e) {
