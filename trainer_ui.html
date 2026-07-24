@@ -222,13 +222,13 @@
                         <option value="custom">Custom / Personalizada</option>
                     </select>
                     <input type="number" id="precache_target_area" value="589824" style="margin-top:6px; display:none;">
+                    <div id="vram_hint" style="margin-top:6px; font-size:0.75rem; color:var(--text-muted);"></div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label>Multiple / Múltiplo:</label>
                         <select id="precache_multiple">
-                            <option value="8">8</option>
                             <option value="16" selected>16</option>
                             <option value="32">32</option>
                             <option value="64">64</option>
@@ -305,6 +305,24 @@
                     <div class="form-group">
                         <label>Grad Accum Steps:</label>
                         <input type="number" id="train_grad_accum" value="4">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>LoRA Target / Capas:</label>
+                        <select id="train_lora_target">
+                            <option value="all" selected>All / Todas (máx. calidad)</option>
+                            <option value="attn+ff">Attn + FF (sin text_fusion)</option>
+                            <option value="attn">Attn only / Sólo atención (mín. VRAM)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Compact Text / Compactar texto:</label>
+                        <select id="train_compact_text">
+                            <option value="true" selected>ON (flash attention, requiere Batch 1)</option>
+                            <option value="false">OFF</option>
+                        </select>
                     </div>
                 </div>
 
@@ -502,6 +520,13 @@
             checkCheckpointInfo();
         }
 
+        // VRAM estimada con batch_size 1, LoRA rank 16 y compact_text activo.
+        const VRAM_HINTS = {
+            '262144':  '~8.6 GB de VRAM · rápido',
+            '589824':  '~9.2 GB de VRAM · ~2.2x más lento que 512² · recomendado para 12 GB',
+            '1048576': '~10.3 GB de VRAM · ajustado en 12 GB, requiere GPU libre'
+        };
+
         function syncResolution(val) {
             const customInput = document.getElementById('precache_target_area');
             if (val === 'custom') {
@@ -509,6 +534,11 @@
             } else {
                 customInput.style.display = 'none';
                 customInput.value = val;
+            }
+            const hint = document.getElementById('vram_hint');
+            if (hint) {
+                hint.textContent = VRAM_HINTS[String(val)] ||
+                    'Resolución personalizada: la VRAM crece de forma aproximadamente lineal con el área.';
             }
         }
 
@@ -530,6 +560,7 @@
                             sel.value = 'custom';
                             document.getElementById('precache_target_area').style.display = 'block';
                         }
+                        syncResolution(sel.value);
                     }
                     if (p.multiple) document.getElementById('precache_multiple').value = p.multiple;
                     if (p.max_side) document.getElementById('precache_max_side').value = p.max_side;
@@ -543,6 +574,8 @@
                     if (t.lora_alpha) document.getElementById('train_lora_alpha').value = t.lora_alpha;
                     if (t.batch_size) document.getElementById('train_batch_size').value = t.batch_size;
                     if (t.grad_accum_steps) document.getElementById('train_grad_accum').value = t.grad_accum_steps;
+                    if (t.lora_target) document.getElementById('train_lora_target').value = t.lora_target;
+                    if (t.compact_text !== undefined) document.getElementById('train_compact_text').value = String(!!t.compact_text);
                     if (t.save_every) document.getElementById('train_save_every').value = t.save_every;
                     if (t.seed) document.getElementById('train_seed').value = t.seed;
                     if (t.preview_every) document.getElementById('train_preview_every').value = t.preview_every;
@@ -554,6 +587,7 @@
                 loadDatasetInfo();
             } catch (e) {}
         }
+        syncResolution(document.getElementById('target_area_select').value);
         loadSettings();
 
         // CARGAR FICHERO JSON
@@ -585,6 +619,7 @@
                             sel.value = 'custom';
                             document.getElementById('precache_target_area').style.display = 'block';
                         }
+                        syncResolution(sel.value);
                     }
                     if (data.multiple !== undefined) document.getElementById('precache_multiple').value = data.multiple;
                     if (data.max_side !== undefined) document.getElementById('precache_max_side').value = data.max_side;
@@ -596,6 +631,8 @@
                     if (data.lora_alpha !== undefined) document.getElementById('train_lora_alpha').value = data.lora_alpha;
                     if (data.batch_size !== undefined) document.getElementById('train_batch_size').value = data.batch_size;
                     if (data.grad_accum_steps !== undefined) document.getElementById('train_grad_accum').value = data.grad_accum_steps;
+                    if (data.lora_target !== undefined) document.getElementById('train_lora_target').value = data.lora_target;
+                    if (data.compact_text !== undefined) document.getElementById('train_compact_text').value = String(!!data.compact_text);
                     if (data.save_every !== undefined) document.getElementById('train_save_every').value = data.save_every;
                     if (data.seed !== undefined) document.getElementById('train_seed').value = data.seed;
                     if (data.preview_every !== undefined) document.getElementById('train_preview_every').value = data.preview_every;
@@ -684,6 +721,8 @@
                 lora_alpha: parseInt(document.getElementById('train_lora_alpha').value),
                 batch_size: parseInt(document.getElementById('train_batch_size').value),
                 grad_accum_steps: parseInt(document.getElementById('train_grad_accum').value),
+                lora_target: document.getElementById('train_lora_target').value,
+                compact_text: document.getElementById('train_compact_text').value === 'true',
                 save_every: parseInt(document.getElementById('train_save_every').value),
                 seed: parseInt(document.getElementById('train_seed').value),
                 preview_every: parseInt(document.getElementById('train_preview_every').value),

@@ -61,8 +61,11 @@ if PROJECT_NAME:
 else:
     CACHE_DIR = cfg.get("cache_dir", DEFAULTS["cache_dir"])
 
-# Validar que Múltiplo sea únicamente 8, 16, 32 o 64 (Default: 16)
-if MULTIPLE not in (8, 16, 32, 64):
+# Validar que Múltiplo sea únicamente 16, 32 o 64 (Default: 16).
+# 8 no vale: pack_latents() del entrenador divide las dimensiones latentes (px/8)
+# entre 2, así que los píxeles deben ser múltiplo de 16 o el empaquetado se
+# corrompe en silencio.
+if MULTIPLE not in (16, 32, 64):
     print(f"⚠ Invalid Multiple {MULTIPLE}. Defaulting to 16 / Múltiplo inválido {MULTIPLE}. Usando 16 por defecto.")
     MULTIPLE = 16
 

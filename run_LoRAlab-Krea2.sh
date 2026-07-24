@@ -60,4 +60,8 @@ echo ""
 echo "Presiona Ctrl+C para detener el servidor."
 echo ""
 
+# Reduce la fragmentacion de VRAM, decisiva en GPUs de 12 GB a 768x768 o mas.
+# server.py lanza los scripts con subprocess.Popen sin env=, asi que lo heredan.
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+
 "$PYTHON_EXE" "$BASE_DIR/server.py"

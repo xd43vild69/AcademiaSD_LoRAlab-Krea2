@@ -15,6 +15,11 @@ import signal
 import sys
 from collections import defaultdict
 
+# Debe fijarse antes de que se inicialice el asignador CUDA. Reduce la
+# fragmentación de VRAM, que es el modo de fallo típico en GPUs de 12 GB al
+# entrenar a 768x768 o más.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -56,6 +61,8 @@ DEFAULTS = {
     "preview_caption_mode": "first",
     "project_name": "",
     "trigger_word": "",
+    "lora_target": "all",
+    "compact_text": True,
 }
 
 # ── CARGAR CONFIGURACIÓN / LOAD CONFIG ──────────────────────────────────────
@@ -89,6 +96,22 @@ PREVIEW_CFG       = cfg.get("preview_cfg",       DEFAULTS["preview_cfg"])
 PREVIEW_CAPTION_MODE = cfg.get("preview_caption_mode", DEFAULTS["preview_caption_mode"])
 TRIGGER_WORD      = cfg.get("trigger_word", "")
 PROJECT_NAME      = cfg.get("project_name", "").strip()
+LORA_TARGET       = str(cfg.get("lora_target", DEFAULTS["lora_target"])).strip().lower()
+COMPACT_TEXT      = bool(cfg.get("compact_text", DEFAULTS["compact_text"]))
+
+if LORA_TARGET not in ("all", "attn", "attn+ff"):
+    print(f"[!] Invalid lora_target '{LORA_TARGET}'. Using 'all' / lora_target inválido. Usando 'all'.")
+    LORA_TARGET = "all"
+
+# La compactación de texto elimina los tokens de relleno de cada caption, lo que
+# permite prescindir de la máscara de atención. Con máscara + GQA, PyTorch no
+# puede usar ni flash ni mem-efficient y cae al backend `math`, que materializa
+# la matriz [B, heads, S, S] completa (~568 MB a 768x768). Sin máscara usa flash.
+# Sólo es aplicable con batch 1: al compactar, cada muestra queda con una
+# longitud de texto distinta y torch.cat dejaría de funcionar.
+if COMPACT_TEXT and BATCH_SIZE > 1:
+    print("[!] compact_text requires batch_size 1; disabling / compact_text requiere batch_size 1; desactivado.")
+    COMPACT_TEXT = False
 
 # Formato automático de carpetas según el nombre del proyecto
 if PROJECT_NAME:
@@ -106,7 +129,9 @@ print(f"  Output Dir / Salida      : {OUTPUT_DIR}")
 print(f"  Total Steps / Pasos      : {TOTAL_STEPS}")
 print(f"  Learning Rate / LR       : {LR}")
 print(f"  LoRA Rank/Alpha          : {LORA_RANK}/{LORA_ALPHA}")
+print(f"  LoRA Target / Capas      : {LORA_TARGET}")
 print(f"  Batch / Grad Accum       : {BATCH_SIZE}/{GRAD_ACCUM_STEPS}")
+print(f"  Compact Text / Compactar : {'ON' if COMPACT_TEXT else 'OFF'}")
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 RESUME_DIR = os.path.join(OUTPUT_DIR, "resume_checkpoint")
@@ -120,6 +145,33 @@ random.seed(SEED)
 def free_vram():
     gc.collect()
     torch.cuda.empty_cache()
+
+
+def patch_attention_for_low_vram():
+    """Evita el backend `math` de SDPA cuando hay que conservar la máscara.
+
+    PyTorch no admite `attn_mask` junto con `enable_gqa=True` ni en flash ni en
+    mem-efficient, así que recae en `math`, que materializa la matriz completa
+    [B, heads, S, S]. Expandiendo K/V al número de cabezas de Q se puede pasar
+    `enable_gqa=False` y mem-efficient vuelve a estar disponible: el coste son
+    unas decenas de MB de K/V frente a cientos de MB de scores.
+
+    Sin máscara (ver COMPACT_TEXT) flash ya funciona con GQA y esto no actúa.
+    """
+    from diffusers.models.transformers import transformer_krea2
+
+    original = transformer_krea2.dispatch_attention_fn
+
+    def dispatch(query, key, value, *args, attn_mask=None, enable_gqa=False, **kwargs):
+        if attn_mask is not None and enable_gqa and key.shape[2] != query.shape[2]:
+            repeats = query.shape[2] // key.shape[2]
+            key = key.repeat_interleave(repeats, dim=2)
+            value = value.repeat_interleave(repeats, dim=2)
+            enable_gqa = False
+        return original(query, key, value, *args, attn_mask=attn_mask, enable_gqa=enable_gqa, **kwargs)
+
+    transformer_krea2.dispatch_attention_fn = dispatch
+    print("[OK] Attention patched to avoid the SDPA math backend / Atención parcheada para evitar el backend math.")
 
 
 def ensure_model_downloaded(local_path, repo_id):
@@ -342,9 +394,15 @@ def run_preview(model, scheduler, embed, mask, neg, size, step, shift_cfg):
     latents = torch.randn((1, 16, H // 8, W // 8), generator=g, device=device, dtype=torch.bfloat16)
     latents = pack_latents(latents)
     pos_ids = prepare_position_ids(embed.shape[1], gh, gw, device)
-    embed, mask = embed.to(device), mask.to(device)
+    embed = embed.to(device)
+    mask = mask.to(device) if mask is not None else None
+    neg_pos_ids = None
     if neg is not None:
-        neg = (neg[0].to(device), neg[1].to(device))
+        neg = (neg[0].to(device), neg[1].to(device) if neg[1] is not None else None)
+        # Compactado, el prompt negativo tiene menos tokens que el positivo, así
+        # que necesita sus propios position_ids.
+        neg_pos_ids = (pos_ids if neg[0].shape[1] == embed.shape[1]
+                       else prepare_position_ids(neg[0].shape[1], gh, gw, device))
 
     sigmas = np.linspace(1.0, 1.0 / PREVIEW_STEPS, PREVIEW_STEPS)
     mu = calculate_shift(latents.shape[1], *shift_cfg)
@@ -357,7 +415,7 @@ def run_preview(model, scheduler, embed, mask, neg, size, step, shift_cfg):
                          position_ids=pos_ids, encoder_attention_mask=mask, return_dict=False)[0]
             if neg is not None:
                 pred_u = model(hidden_states=latents, encoder_hidden_states=neg[0], timestep=tt,
-                               position_ids=pos_ids, encoder_attention_mask=neg[1], return_dict=False)[0]
+                               position_ids=neg_pos_ids, encoder_attention_mask=neg[1], return_dict=False)[0]
                 pred = pred + PREVIEW_CFG * (pred - pred_u)
             latents = scheduler.step(pred, t, latents, return_dict=False)[0]
 
@@ -382,6 +440,7 @@ def run_preview(model, scheduler, embed, mask, neg, size, step, shift_cfg):
 def train_krea2():
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.benchmark = True
+    patch_attention_for_low_vram()
 
     if not os.path.exists(CACHE_DIR) or not any(f.endswith("_latent.pt") for f in os.listdir(CACHE_DIR)):
         print(f"\n[!] ERROR: Cache directory '{CACHE_DIR}' is empty or does not exist.")
@@ -435,9 +494,25 @@ def train_krea2():
 
     transformer.enable_gradient_checkpointing()
 
-    target_modules = [name for name, m in transformer.named_modules()
-                      if isinstance(m, (torch.nn.Linear, bnb.nn.Linear4bit))]
-    print(f"Target LoRA Layers / Capas LoRA objetivo: {len(target_modules)}")
+    all_linears = [name for name, m in transformer.named_modules()
+                   if isinstance(m, (torch.nn.Linear, bnb.nn.Linear4bit))]
+
+    def keep(name):
+        # 'all' incluye también los bloques de text_fusion; los presets reducidos
+        # se limitan a los transformer_blocks de imagen, que es donde el LoRA rinde.
+        if LORA_TARGET == "all":
+            return True
+        if not name.startswith("transformer_blocks."):
+            return False
+        if ".attn." in name:
+            return True
+        return LORA_TARGET == "attn+ff" and ".ff." in name
+
+    target_modules = [n for n in all_linears if keep(n)]
+    if not target_modules:
+        print(f"[!] lora_target '{LORA_TARGET}' matched no layers; falling back to 'all' / no coincidió con ninguna capa.")
+        target_modules = all_linears
+    print(f"Target LoRA Layers / Capas LoRA objetivo: {len(target_modules)}/{len(all_linears)} ({LORA_TARGET})")
 
     lora_config = LoraConfig(
         r=LORA_RANK, lora_alpha=LORA_ALPHA, lora_dropout=0.0,
@@ -468,7 +543,9 @@ def train_krea2():
     transformer.img_in.register_forward_hook(_make_inputs_require_grad)
 
     trainable = [p for p in model.parameters() if p.requires_grad]
-    optimizer = bnb.optim.AdamW8bit(trainable, lr=LR, weight_decay=WEIGHT_DECAY)
+    # Paged: vuelca el estado del optimizador a RAM bajo presión de VRAM en lugar
+    # de reventar con OOM en los picos de las resoluciones altas.
+    optimizer = bnb.optim.PagedAdamW8bit(trainable, lr=LR, weight_decay=WEIGHT_DECAY)
 
     def lr_at(step):
         if step < WARMUP_STEPS:
@@ -529,6 +606,21 @@ def train_krea2():
     pin = torch.cuda.is_available()
     cache_data, buckets = {}, defaultdict(list)
 
+    def compact(emb, msk):
+        """Se queda sólo con los tokens reales del caption y descarta la máscara.
+
+        Es exacto: los tokens de texto no llevan RoPE (prepare_position_ids les
+        asigna la posición 0 a todos) ni en text_fusion, así que la atención es
+        equivariante a permutación sobre ellos, y sus salidas se descartan en
+        `hidden_states[:, text_seq_len:]`. La máscara sólo servía como
+        key-padding, de modo que eliminar los tokens de relleno equivale a
+        enmascararlos, y sin máscara SDPA puede usar flash attention.
+        """
+        idx = msk[0].nonzero(as_tuple=True)[0]
+        if idx.numel() == 0:      # caption sin tokens válidos: dejarlo como estaba
+            return emb, msk
+        return emb[:, idx].contiguous(), None
+
     for f in os.listdir(CACHE_DIR):
         if f.startswith(".") or not f.endswith("_latent.pt"):
             continue
@@ -536,16 +628,23 @@ def train_krea2():
         lat  = torch.load(f"{CACHE_DIR}/{nombre}_latent.pt", weights_only=True)
         emb  = torch.load(f"{CACHE_DIR}/{nombre}_embed.pt",  weights_only=True)
         msk  = torch.load(f"{CACHE_DIR}/{nombre}_mask.pt",   weights_only=True).bool()
-        lat, emb, msk = lat.to(torch.bfloat16), emb.to(torch.bfloat16), msk
+        lat, emb = lat.to(torch.bfloat16), emb.to(torch.bfloat16)
+        if COMPACT_TEXT:
+            emb, msk = compact(emb, msk)
         if pin:
-            lat, emb, msk = lat.pin_memory(), emb.pin_memory(), msk.pin_memory()
+            lat, emb = lat.pin_memory(), emb.pin_memory()
+            if msk is not None:
+                msk = msk.pin_memory()
         cache_data[nombre] = (lat, emb, msk)
         buckets[(lat.shape[2], lat.shape[3])].append(nombre)
 
     neg = None
     if os.path.exists(f"{CACHE_DIR}/_neg_embed.pt"):
-        neg = (torch.load(f"{CACHE_DIR}/_neg_embed.pt", weights_only=True),
-               torch.load(f"{CACHE_DIR}/_neg_mask.pt",  weights_only=True).bool())
+        neg_emb = torch.load(f"{CACHE_DIR}/_neg_embed.pt", weights_only=True)
+        neg_msk = torch.load(f"{CACHE_DIR}/_neg_mask.pt",  weights_only=True).bool()
+        if COMPACT_TEXT:
+            neg_emb, neg_msk = compact(neg_emb, neg_msk)
+        neg = (neg_emb, neg_msk)
 
     pos_cache = {}
     def get_pos_ids(text_len, lh, lw):
@@ -577,7 +676,9 @@ def train_krea2():
             names = [random.choice(buckets[size]) for _ in range(BATCH_SIZE)]
             latents = torch.cat([cache_data[n][0] for n in names]).to("cuda", non_blocking=True)
             embeds  = torch.cat([cache_data[n][1] for n in names]).to("cuda", non_blocking=True)
-            masks   = torch.cat([cache_data[n][2] for n in names]).to("cuda", non_blocking=True)
+            masks   = None
+            if not COMPACT_TEXT:
+                masks = torch.cat([cache_data[n][2] for n in names]).to("cuda", non_blocking=True)
 
             latent_patched = pack_latents(latents)
             B, seq_img, _ = latent_patched.shape
