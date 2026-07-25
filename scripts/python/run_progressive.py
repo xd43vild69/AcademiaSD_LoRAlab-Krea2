@@ -78,6 +78,54 @@ def _forward_signal(signum, frame):
                 pass
 
 
+def _phase_done(phase_output, step_count):
+    """True si la fase ya alcanzó su cuenta de pasos (checkpoint completo)."""
+    try:
+        with open(os.path.join(phase_output, "current_step.txt"), "r", encoding="utf-8") as f:
+            return int(f.read().strip()) >= step_count
+    except Exception:
+        return False
+
+
+def _run_signature(cfg, preset, total_steps, cache_base):
+    """Identidad de la configuración: si cambia, los pesos previos ya no valen."""
+    return "|".join(str(x) for x in (
+        preset, total_steps, cache_base,
+        cfg.get("lora_rank"), cfg.get("lora_alpha"), cfg.get("lora_target"),
+    ))
+
+
+def resolve_run_id(output_base, signature, phase_outputs, step_counts):
+    """Decide si esto es un run nuevo o la reanudación de uno interrumpido.
+
+    El entrenador da prioridad a su propio checkpoint sobre init_lora_from, así que
+    sin esta marca un pipeline relanzado restauraría los pesos viejos de cada fase,
+    ignoraría el hand-off y correría un bucle vacío reportando éxito. El run_id
+    permite a cada fase distinguir "mi checkpoint" de "el de un run anterior".
+    """
+    state_path = os.path.join(output_base, ".progressive_run.json")
+    state = {}
+    try:
+        with open(state_path, "r", encoding="utf-8") as f:
+            state = json.load(f)
+    except Exception:
+        state = {}
+
+    pipeline_done = all(_phase_done(o, sc) for o, sc in zip(phase_outputs, step_counts))
+    resuming = bool(state.get("run_id")) and state.get("signature") == signature and not pipeline_done
+
+    # El sufijo aleatorio evita que dos runs dentro del mismo segundo compartan id:
+    # con id repetido los checkpoints del run anterior volverían a darse por válidos.
+    run_id = state["run_id"] if resuming else f"{time.strftime('%Y%m%d-%H%M%S')}-{os.urandom(3).hex()}"
+    os.makedirs(output_base, exist_ok=True)
+    try:
+        with open(state_path, "w", encoding="utf-8") as f:
+            json.dump({"run_id": run_id, "signature": signature}, f, indent=2)
+    except Exception as exc:
+        print(f"[!] Could not write run state / No se pudo escribir el estado del run: {exc}")
+    return run_id, resuming
+
+
 def derive_dirs(cfg):
     """Reproduce la lógica project_name → carpetas de los scripts."""
     def anchor(path):
@@ -126,12 +174,20 @@ def main():
     step_counts = [max(1, round(p["portion"] * total_steps)) for p in phases]
     step_counts[-1] += total_steps - sum(step_counts)
 
+    phase_outputs = [os.path.join(output_base, f"phase{i}_{p['label']}")
+                     for i, p in enumerate(phases)]
+    signature = _run_signature(cfg, preset, total_steps, cache_base)
+    run_id, resuming = resolve_run_id(output_base, signature, phase_outputs, step_counts)
+
     PHASE_SETTINGS_DIR.mkdir(exist_ok=True)
     print("=" * 70)
     print(f"PROGRESSIVE TRAINING / ENTRENAMIENTO PROGRESIVO: {preset}")
     print(f"  Cache base   : {cache_base}")
     print(f"  Output base  : {output_base}")
     print(f"  Total steps  : {total_steps}")
+    print(f"  Run ID       : {run_id} ({'REANUDANDO / RESUMING' if resuming else 'NUEVO / NEW'})")
+    if not resuming:
+        print("  Los checkpoints de runs anteriores se descartan / Previous-run checkpoints are discarded.")
     for i, (p, sc) in enumerate(zip(phases, step_counts)):
         print(f"  Fase {i}: {p['label']}²  {sc} pasos  gc={'ON' if p['gc'] else 'OFF'}")
     print("=" * 70, flush=True)
@@ -151,7 +207,7 @@ def main():
             print("[!] ¿Ejecutaste el Pre-Caché en modo progresivo? / Did you run the progressive Pre-Cache?")
             return 1
 
-        phase_output = os.path.join(output_base, f"phase{i}_{label}")
+        phase_output = phase_outputs[i]
 
         # Settings de la fase: sin project_name para que cache/output explícitos manden.
         phase_cfg = dict(cfg)
@@ -164,6 +220,14 @@ def main():
             "total_steps": int(sc),
             "gradient_checkpointing": bool(phase["gc"]),
             "init_lora_from": prev_resume or "",
+            "run_id": run_id,
+            # Sólo para la línea de progreso: sin esto la consola reinicia el paso, el
+            # LR y la loss en cada fase y parece que el entrenamiento arranca de cero.
+            "phase_index": i,
+            "phase_count": len(phases),
+            "phase_label": label,
+            "global_step_offset": int(sum(step_counts[:i])),
+            "global_total_steps": int(total_steps),
         })
         if "batch" in phase:
             phase_cfg["batch_size"] = int(phase["batch"])
