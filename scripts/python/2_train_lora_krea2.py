@@ -152,6 +152,13 @@ DEFAULTS = {
 
     # ── D3: caption dropout ──────────────────────────────────────────────────
     "caption_dropout_rate": 0.0,
+
+    # ── Progresivo / Multi-fase ───────────────────────────────────────────────
+    "run_id": "",
+    "phase_index": 0,
+    "phase_count": 1,
+    "phase_label": "",
+    "global_step_offset": 0,
 }
 
 # Bundles de valores recomendados. Cambian los *defaults*, nunca pisan una clave
@@ -256,6 +263,16 @@ INIT_LORA_FROM    = str(_cfg("init_lora_from")).strip()
 if INIT_LORA_FROM:
     INIT_LORA_FROM = from_root(INIT_LORA_FROM)
 GRAD_CHECKPOINTING = bool(_cfg("gradient_checkpointing"))
+# Identifica la corrida del pipeline progresivo a la que pertenece un checkpoint.
+# Vacío = entrenador suelto, sin comprobación (comportamiento clásico).
+RUN_ID            = str(_cfg("run_id")).strip()
+# Contexto de fase: sólo afecta a la línea de progreso.
+PHASE_INDEX       = int(_cfg("phase_index"))
+PHASE_COUNT       = int(_cfg("phase_count"))
+PHASE_LABEL       = str(_cfg("phase_label")).strip()
+GLOBAL_STEP_OFFSET = int(_cfg("global_step_offset"))
+GLOBAL_TOTAL_STEPS = int(cfg.get("global_total_steps", TOTAL_STEPS))
+MULTIPHASE        = PHASE_COUNT > 1
 
 # ── Claves añadidas (Fases A–D). Todas con default = comportamiento histórico ──
 LORA_DTYPE_NAME   = str(_cfg("lora_dtype")).strip().lower()
@@ -419,6 +436,10 @@ def _print_effective_config():
         ("preview_every",        f"{PREVIEW_EVERY} (source {PREVIEW_SOURCE})" if PREVIEW_EVERY else "off"),
         ("seed",                 SEED),
     ]
+    if MULTIPHASE:
+        rows.append(("phase", f"{PHASE_INDEX+1}/{PHASE_COUNT} ({PHASE_LABEL}²), global {GLOBAL_STEP_OFFSET}-{GLOBAL_STEP_OFFSET + TOTAL_STEPS}/{GLOBAL_TOTAL_STEPS}"))
+    if RUN_ID:
+        rows.append(("run_id", RUN_ID))
     width = max(len(k) for k, _ in rows)
     print("\n" + "=" * 78)
     print(f"EFFECTIVE CONFIG" + (f"  [preset: {PRESET_NAME}]" if PRESET_NAME else ""))
@@ -433,9 +454,27 @@ def _print_effective_config():
 _print_effective_config()
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-RESUME_DIR = os.path.join(OUTPUT_DIR, "resume_checkpoint")
-OPT_FILE   = os.path.join(OUTPUT_DIR, "optimizer.pt")
-STEP_FILE  = os.path.join(OUTPUT_DIR, "current_step.txt")
+RESUME_DIR   = os.path.join(OUTPUT_DIR, "resume_checkpoint")
+OPT_FILE     = os.path.join(OUTPUT_DIR, "optimizer.pt")
+STEP_FILE    = os.path.join(OUTPUT_DIR, "current_step.txt")
+RUN_ID_FILE  = os.path.join(OUTPUT_DIR, "run_id.txt")
+
+
+def checkpoint_belongs_to_this_run():
+    """¿El checkpoint de esta carpeta es de la corrida actual del pipeline?
+
+    Sin RUN_ID (entrenador suelto) siempre se acepta. Con RUN_ID, un checkpoint de
+    una corrida anterior debe descartarse: si no, la fase lo restauraría con
+    start_step == total_steps, ignoraría init_lora_from y correría un bucle vacío.
+    """
+    if not RUN_ID:
+        return True
+    try:
+        with open(RUN_ID_FILE, "r", encoding="utf-8") as f:
+            return f.read().strip() == RUN_ID
+    except Exception:
+        return False
+
 
 torch.manual_seed(SEED)
 torch.cuda.manual_seed_all(SEED)
@@ -698,6 +737,41 @@ def load_nf4_cache_(transformer, cache_dir):
 
     print("[OK] NF4 cache loaded successfully / Caché NF4 cargada correctamente.")
     return transformer
+
+
+def _lora_b_norm(model):
+    """‖lora_B‖ global. PEFT inicializa lora_B a cero exacto, así que un valor > 0
+    demuestra que una carga de pesos aterrizó de verdad sobre el adapter."""
+    total = 0.0
+    for name, p in model.named_parameters():
+        if "lora_B" in name:
+            total += p.detach().float().pow(2).sum().item()
+    return total ** 0.5
+
+
+def load_lora_weights(model, blob, src):
+    """Carga pesos LoRA en el adapter y verifica que la carga surtió efecto.
+
+    set_peft_model_state_dict usa load_state_dict(strict=False): si las claves no
+    encajaran (rank/alpha/lora_target distintos a los del checkpoint) no lanzaría
+    ningún error y la fase entrenaría desde init aleatorio en silencio. Preferimos
+    fallar duro: el orquestador aborta el pipeline ante un código de salida != 0.
+    """
+    res = set_peft_model_state_dict(model, load(blob))
+    unexpected = list(getattr(res, "unexpected_keys", []) or [])
+    if unexpected:
+        print(f"[!] {len(unexpected)} unexpected keys loading / claves inesperadas al cargar {src}")
+        for k in unexpected[:5]:
+            print(f"    - {k}")
+        sys.exit(1)
+
+    b_norm = _lora_b_norm(model)
+    if b_norm == 0.0:
+        print(f"[!] LoRA load was a no-op (‖lora_B‖ = 0) / la carga no surtió efecto: {src}")
+        print("[!] ¿Coinciden lora_rank/lora_alpha/lora_target con los del checkpoint?")
+        sys.exit(1)
+    print(f"    ‖lora_B‖ = {b_norm:.4f}")
+    return b_norm
 
 
 def _export_lora(model, path, step=None, epoch=None, num_images=None):
@@ -1176,7 +1250,17 @@ def train_krea2():
     start_step = 0
     pending_state = None       # sampler/EMA/RNG: se aplican tras construirlos
     lora_weights_path = os.path.join(RESUME_DIR, "adapter_model.safetensors")
-    if os.path.exists(STEP_FILE) and os.path.exists(OPT_FILE) and os.path.exists(lora_weights_path):
+    have_checkpoint = (os.path.exists(STEP_FILE) and os.path.exists(OPT_FILE)
+                       and os.path.exists(lora_weights_path))
+    if have_checkpoint and not checkpoint_belongs_to_this_run():
+        print("=" * 65)
+        print("[i] Checkpoint from a previous pipeline run; discarding it / "
+              "Checkpoint de una corrida anterior del pipeline; se descarta.")
+        print(f"    {RESUME_DIR}")
+        print("=" * 65)
+        have_checkpoint = False
+
+    if have_checkpoint:
         print("=" * 65)
         print("¡Checkpoint detected! Restoring state... / ¡Checkpoint detectado! Restaurando estado...")
         try:
@@ -1201,7 +1285,7 @@ def train_krea2():
                 pending_state = state
 
             with open(lora_weights_path, "rb") as f:
-                set_peft_model_state_dict(model, load(f.read()))
+                load_lora_weights(model, f.read(), lora_weights_path)
             print(f"Resuming training from step / Reanudando entrenamiento desde el paso {start_step}...")
         except Exception as exc:
             # Antes esto ponía start_step = 0 *después* de haber cargado pesos: al
@@ -1234,11 +1318,12 @@ def train_krea2():
             print("=" * 65)
             print(f"Phase hand-off: loading LoRA weights from previous phase / Cargando LoRA de la fase previa:\n  {prev_adapter}")
             with open(prev_adapter, "rb") as f:
-                set_peft_model_state_dict(model, load(f.read()))
+                load_lora_weights(model, f.read(), prev_adapter)
             print("[OK] LoRA initialized from previous phase; optimizer starts fresh / LoRA inicializada; optimizador desde cero.")
             print("=" * 65)
         else:
             print(f"[!] init_lora_from set but adapter not found / adapter no encontrado: {prev_adapter}")
+            sys.exit(1)
 
     last_step_executed = start_step
     sampler = None             # lo construye el cargador de caché, más abajo
@@ -1283,6 +1368,9 @@ def train_krea2():
                 "fingerprint": FINGERPRINT,
             }
             _atomic_write(OPT_FILE, lambda p: torch.save(state, p))
+
+            if RUN_ID:
+                _atomic_write(RUN_ID_FILE, lambda p: open(p, "w", encoding="utf-8").write(RUN_ID))
 
             ckpt = os.path.join(OUTPUT_DIR, f"Krea2_LoRA_step_{current_s}.safetensors")
             # El LoRA que se entrega es el EMA; el resume_checkpoint conserva los
@@ -1740,9 +1828,13 @@ def train_krea2():
 
             t_step     = time.time() - t0
             t_step_avg = t_step if t_step_avg == 0 else 0.1 * t_step + 0.9 * t_step_avg
-            eta_s      = (TOTAL_STEPS - step) * t_step_avg
+            # En multifase la barra, el % y la ETA son globales: el hand-off conserva
+            # los pesos, así que reiniciarlos por fase haría parecer que se empieza de cero.
+            done_steps  = GLOBAL_STEP_OFFSET + step
+            total_shown = GLOBAL_TOTAL_STEPS if MULTIPHASE else TOTAL_STEPS
+            eta_s      = (total_shown - done_steps) * t_step_avg
             eta        = f"{int(eta_s//3600):02d}:{int((eta_s%3600)//60):02d}:{int(eta_s%60):02d}"
-            pct        = step / TOTAL_STEPS
+            pct        = done_steps / max(1, total_shown)
             barra      = "█" * int(pct * 20) + "░" * (20 - int(pct * 20))
 
             if LOSS_DISPLAY == "window":
@@ -1751,8 +1843,14 @@ def train_krea2():
                 avg_loss = sum(loss_hist) / max(1, len(loss_hist))
             else:
                 avg_loss = running_loss / max(1, step - start_step)
+
+            if MULTIPHASE:
+                head = (f"[F{PHASE_INDEX+1}/{PHASE_COUNT} {PHASE_LABEL}²] "
+                        f"Paso {step:4d}/{TOTAL_STEPS} · global {done_steps:5d}/{GLOBAL_TOTAL_STEPS}")
+            else:
+                head = f"Step/Paso {step:4d}/{TOTAL_STEPS}"
             progress_line = (
-                f"Step/Paso {step:4d}/{TOTAL_STEPS} [{barra}] {pct*100:5.1f}% | "
+                f"{head} [{barra}] {pct*100:5.1f}% | "
                 f"Loss {avg_loss:.4f} | gnorm {grad_norm:.3f} | "
                 f"lr {lr_at(step):.2e} | ep {sampler.epoch} | {t_step_avg:.2f}s/it | ETA {eta}"
             )
