@@ -34,20 +34,20 @@ echo ""
 case "$MODE" in
     precache)
         echo "[1/1] Ejecutando Pre-Caché..."
-        "$VENV_PYTHON" "$BASE_DIR/1_pre_cache_krea2.py"
+        "$VENV_PYTHON" "$BASE_DIR/scripts/python/1_pre_cache_krea2.py"
         ;;
     train)
         echo "[1/1] Ejecutando Entrenamiento LoRA..."
-        "$VENV_PYTHON" "$BASE_DIR/2_train_lora_krea2.py"
+        "$VENV_PYTHON" "$BASE_DIR/scripts/python/2_train_lora_krea2.py"
         ;;
     all)
         echo "[1/2] Paso 1: Ejecutando Pre-Caché..."
-        "$VENV_PYTHON" "$BASE_DIR/1_pre_cache_krea2.py"
+        "$VENV_PYTHON" "$BASE_DIR/scripts/python/1_pre_cache_krea2.py"
         
         if [ $? -eq 0 ]; then
             echo ""
             echo "[2/2] Paso 2: Ejecutando Entrenamiento LoRA..."
-            "$VENV_PYTHON" "$BASE_DIR/2_train_lora_krea2.py"
+            "$VENV_PYTHON" "$BASE_DIR/scripts/python/2_train_lora_krea2.py"
         else
             echo "[ERROR] El Pre-Caché falló. Cancelando entrenamiento."
             exit 1

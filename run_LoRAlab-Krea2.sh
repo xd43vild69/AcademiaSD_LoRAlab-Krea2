@@ -35,13 +35,13 @@ echo "Entorno Python encontrado:"
 echo "$PYTHON_EXE"
 echo ""
 
-if [ ! -f "$BASE_DIR/server.py" ]; then
-    echo "[ERROR] No existe server.py"
+if [ ! -f "$BASE_DIR/scripts/python/server.py" ]; then
+    echo "[ERROR] No existe scripts/python/server.py"
     exit 1
 fi
 
-if [ ! -f "$BASE_DIR/trainer_ui.html" ]; then
-    echo "[ERROR] No existe trainer_ui.html"
+if [ ! -f "$BASE_DIR/web/trainer_ui.html" ]; then
+    echo "[ERROR] No existe web/trainer_ui.html"
     exit 1
 fi
 
@@ -64,4 +64,4 @@ echo ""
 # server.py lanza los scripts con subprocess.Popen sin env=, asi que lo heredan.
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 
-"$PYTHON_EXE" "$BASE_DIR/server.py"
+"$PYTHON_EXE" "$BASE_DIR/scripts/python/server.py"

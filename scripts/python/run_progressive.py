@@ -28,14 +28,18 @@ try:
 except Exception:
     pass
 
+# BASE_DIR es scripts/python/; PROJECT_ROOT es la raíz del proyecto, contra la
+# que se resuelven configuración y datos generados.
 BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent.parent
+
 TRAIN_SCRIPT = BASE_DIR / "2_train_lora_krea2.py"
-CONFIG_PATH = os.environ.get("TRAIN_SETTINGS_PATH", str(BASE_DIR / "train_settings.json"))
-PHASE_SETTINGS_DIR = BASE_DIR / ".progressive_phases"
+CONFIG_PATH = os.environ.get("TRAIN_SETTINGS_PATH", str(PROJECT_ROOT / "train_settings.json"))
+PHASE_SETTINGS_DIR = PROJECT_ROOT / ".progressive_phases"
 
 # Carpetas contenedoras: todo lo generado se agrupa aquí en vez de en la raíz.
-CACHE_ROOT = "./cached_data_local"
-OUTPUT_ROOT = "./output_local"
+CACHE_ROOT = str(PROJECT_ROOT / "cached_data_local")
+OUTPUT_ROOT = str(PROJECT_ROOT / "output_local")
 
 # ── PRESETS DE FASES ─────────────────────────────────────────────────────────
 # label: subdir de la caché (lo genera el pre-cache con round(sqrt(area))).
@@ -76,13 +80,17 @@ def _forward_signal(signum, frame):
 
 def derive_dirs(cfg):
     """Reproduce la lógica project_name → carpetas de los scripts."""
+    def anchor(path):
+        """Las rutas relativas del JSON se resuelven contra la raíz del proyecto."""
+        return path if os.path.isabs(path) else os.path.normpath(os.path.join(str(PROJECT_ROOT), path))
+
     project = str(cfg.get("project_name", "")).strip()
     if project:
-        cache_base = f"{CACHE_ROOT}/{project}"
-        output_base = f"{OUTPUT_ROOT}/{project}"
+        cache_base = os.path.join(CACHE_ROOT, project)
+        output_base = os.path.join(OUTPUT_ROOT, project)
     else:
-        cache_base = cfg.get("cache_dir", f"{CACHE_ROOT}/default")
-        output_base = cfg.get("output_dir", f"{OUTPUT_ROOT}/default")
+        cache_base = anchor(cfg.get("cache_dir", os.path.join(CACHE_ROOT, "default")))
+        output_base = anchor(cfg.get("output_dir", os.path.join(OUTPUT_ROOT, "default")))
     return cache_base, output_base
 
 
@@ -174,7 +182,7 @@ def main():
         global _current_child
         _current_child = subprocess.Popen(
             [sys.executable, "-u", str(TRAIN_SCRIPT)],
-            cwd=str(BASE_DIR),
+            cwd=str(PROJECT_ROOT),
             env=env,
             stdin=subprocess.DEVNULL,
         )

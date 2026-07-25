@@ -37,9 +37,20 @@ try:
 except Exception:
     pass
 
+# Raíz del proyecto (este script vive en scripts/python/). Todas las rutas se
+# anclan aquí en vez de al directorio de trabajo, para que funcione invocado
+# desde cualquier sitio.
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def from_root(path):
+    """Resuelve una ruta relativa contra la raíz del proyecto (absolutas intactas)."""
+    return path if os.path.isabs(path) else os.path.normpath(os.path.join(PROJECT_ROOT, path))
+
+
 # Carpetas contenedoras: todo lo generado se agrupa aquí en vez de en la raíz.
-CACHE_ROOT  = "./cached_data_local"
-OUTPUT_ROOT = "./output_local"
+CACHE_ROOT  = os.path.join(PROJECT_ROOT, "cached_data_local")
+OUTPUT_ROOT = os.path.join(PROJECT_ROOT, "output_local")
 
 # ── DEFAULTS / VALORES POR DEFECTO ──────────────────────────────────────────
 DEFAULTS = {
@@ -74,7 +85,8 @@ DEFAULTS = {
 # ── CARGAR CONFIGURACIÓN / LOAD CONFIG ──────────────────────────────────────
 # El orquestador de resolución progresiva pasa un fichero por fase vía esta
 # env-var para no pisar el train_settings.json del usuario.
-CONFIG_PATH = os.environ.get("TRAIN_SETTINGS_PATH", "train_settings.json")
+CONFIG_PATH = os.environ.get("TRAIN_SETTINGS_PATH",
+                             os.path.join(PROJECT_ROOT, "train_settings.json"))
 
 if os.path.exists(CONFIG_PATH):
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -85,6 +97,11 @@ else:
     print(f"[!] {CONFIG_PATH} not found, using default values / No se encontró {CONFIG_PATH}, usando valores por defecto.")
 
 MODEL_ID          = cfg.get("model_id",          DEFAULTS["model_id"])
+# El modelo local vive en la raíz del proyecto. Se ancla sólo si la carpeta
+# existe ahí, para no romper el caso de un repo-id de Hugging Face; sin esto,
+# ejecutar desde otro directorio dispararía una descarga completa del modelo.
+if not os.path.isabs(MODEL_ID) and os.path.isdir(from_root(MODEL_ID)):
+    MODEL_ID = from_root(MODEL_ID)
 TOTAL_STEPS       = cfg.get("total_steps",       DEFAULTS["total_steps"])
 BATCH_SIZE        = cfg.get("batch_size",        DEFAULTS["batch_size"])
 GRAD_ACCUM_STEPS  = cfg.get("grad_accum_steps",  DEFAULTS["grad_accum_steps"])
@@ -107,6 +124,8 @@ PROJECT_NAME      = cfg.get("project_name", "").strip()
 LORA_TARGET       = str(cfg.get("lora_target", DEFAULTS["lora_target"])).strip().lower()
 COMPACT_TEXT      = bool(cfg.get("compact_text", DEFAULTS["compact_text"]))
 INIT_LORA_FROM    = str(cfg.get("init_lora_from", DEFAULTS["init_lora_from"])).strip()
+if INIT_LORA_FROM:
+    INIT_LORA_FROM = from_root(INIT_LORA_FROM)
 GRAD_CHECKPOINTING = bool(cfg.get("gradient_checkpointing", DEFAULTS["gradient_checkpointing"]))
 
 if LORA_TARGET not in ("all", "attn", "attn+ff"):
@@ -127,11 +146,11 @@ if COMPACT_TEXT and BATCH_SIZE > 1:
 # Sin project_name se respetan cache_dir/output_dir explícitos: así es como
 # run_progressive.py apunta cada fase a su subdir de resolución y a phaseN_*.
 if PROJECT_NAME:
-    CACHE_DIR  = f"{CACHE_ROOT}/{PROJECT_NAME}"
-    OUTPUT_DIR = f"{OUTPUT_ROOT}/{PROJECT_NAME}"
+    CACHE_DIR  = os.path.join(CACHE_ROOT,  PROJECT_NAME)
+    OUTPUT_DIR = os.path.join(OUTPUT_ROOT, PROJECT_NAME)
 else:
-    CACHE_DIR  = cfg.get("cache_dir",  DEFAULTS["cache_dir"])
-    OUTPUT_DIR = cfg.get("output_dir", DEFAULTS["output_dir"])
+    CACHE_DIR  = from_root(cfg.get("cache_dir",  DEFAULTS["cache_dir"]))
+    OUTPUT_DIR = from_root(cfg.get("output_dir", DEFAULTS["output_dir"]))
 
 print(f"  Model ID / ID Modelo     : {MODEL_ID}")
 print(f"  Project / Proyecto       : {PROJECT_NAME if PROJECT_NAME else '(Default)'}")

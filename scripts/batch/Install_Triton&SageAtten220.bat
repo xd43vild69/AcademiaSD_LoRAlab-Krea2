@@ -2,6 +2,10 @@
 title Triton and SageAttention Installer by Academia SD
 color 0A
 
+:: This script lives in scripts\batch\, so anchor the working directory to the
+:: project root (two levels up) before resolving venv\ and temp files.
+cd /d "%~dp0..\.."
+
 :: Define the portable Python path for ComfyUI
 set PYTHON_EXE=venv\scripts\python.exe
 

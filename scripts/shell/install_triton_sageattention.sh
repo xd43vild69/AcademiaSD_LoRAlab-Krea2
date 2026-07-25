@@ -2,8 +2,10 @@
 
 # Triton and SageAttention Installer for Linux
 
+# Este script vive en scripts/shell/, asi que la raiz esta dos niveles arriba.
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_PYTHON="$BASE_DIR/venv/bin/python"
+PROJECT_ROOT="$(cd "$BASE_DIR/../.." && pwd)"
+VENV_PYTHON="$PROJECT_ROOT/venv/bin/python"
 
 if [ ! -f "$VENV_PYTHON" ]; then
     echo "[ERROR] Entorno virtual no encontrado en $VENV_PYTHON"

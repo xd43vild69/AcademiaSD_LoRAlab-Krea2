@@ -22,8 +22,19 @@ try:
 except Exception:
     pass
 
+# Raíz del proyecto (este script vive en scripts/python/). Todas las rutas se
+# anclan aquí en vez de al directorio de trabajo, para que funcione invocado
+# desde cualquier sitio.
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def from_root(path):
+    """Resuelve una ruta relativa contra la raíz del proyecto (absolutas intactas)."""
+    return path if os.path.isabs(path) else os.path.normpath(os.path.join(PROJECT_ROOT, path))
+
+
 # Carpeta contenedora de todo lo que genera el pre-caché (una sola en la raíz).
-CACHE_ROOT = "./cached_data_local"
+CACHE_ROOT = os.path.join(PROJECT_ROOT, "cached_data_local")
 
 # ── DEFAULTS / VALORES POR DEFECTO ──────────────────────────────────────────
 DEFAULTS = {
@@ -40,7 +51,8 @@ DEFAULTS = {
 }
 
 # ── CARGAR CONFIGURACIÓN / LOAD CONFIG ──────────────────────────────────────
-CONFIG_PATH = "pre_cache_settings.json"
+CONFIG_PATH = os.environ.get("PRECACHE_SETTINGS_PATH",
+                             os.path.join(PROJECT_ROOT, "pre_cache_settings.json"))
 
 if os.path.exists(CONFIG_PATH):
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -51,7 +63,12 @@ else:
     print(f"⚠ {CONFIG_PATH} not found, using defaults / No se encontró {CONFIG_PATH}, usando valores por defecto.")
 
 MODEL_ID     = cfg.get("model_id",     DEFAULTS["model_id"])
-DATASET_PATH = cfg.get("dataset_path", DEFAULTS["dataset_path"])
+# El modelo local vive en la raíz del proyecto. Se ancla sólo si la carpeta
+# existe ahí, para no romper el caso de un repo-id de Hugging Face; sin esto,
+# ejecutar desde otro directorio dispararía una descarga completa del modelo.
+if not os.path.isabs(MODEL_ID) and os.path.isdir(from_root(MODEL_ID)):
+    MODEL_ID = from_root(MODEL_ID)
+DATASET_PATH = from_root(cfg.get("dataset_path", DEFAULTS["dataset_path"]))
 TARGET_AREA  = cfg.get("target_area",  DEFAULTS["target_area"])
 MAX_SIDE     = cfg.get("max_side",     DEFAULTS["max_side"])
 MULTIPLE     = cfg.get("multiple",     DEFAULTS["multiple"])
@@ -74,9 +91,9 @@ def res_label(area):
 # Sin project_name se respeta un cache_dir explícito (lo usa run_progressive.py
 # para apuntar al subdirectorio de resolución de cada fase).
 if PROJECT_NAME:
-    CACHE_DIR = f"{CACHE_ROOT}/{PROJECT_NAME}"
+    CACHE_DIR = os.path.join(CACHE_ROOT, PROJECT_NAME)
 else:
-    CACHE_DIR = cfg.get("cache_dir", DEFAULTS["cache_dir"])
+    CACHE_DIR = from_root(cfg.get("cache_dir", DEFAULTS["cache_dir"]))
 
 # Validar que Múltiplo sea únicamente 16, 32 o 64 (Default: 16).
 # 8 no vale: pack_latents() del entrenador divide las dimensiones latentes (px/8)

@@ -65,15 +65,15 @@ echo Entorno Python encontrado:
 echo %PYTHON_EXE%
 echo.
 
-if not exist "%BASE_DIR%server.py" (
-    echo [ERROR] No existe server.py
+if not exist "%BASE_DIR%scripts\python\server.py" (
+    echo [ERROR] No existe scripts\python\server.py
     echo.
     pause
     exit /b 1
 )
 
-if not exist "%BASE_DIR%trainer_ui.html" (
-    echo [ERROR] No existe trainer_ui.html
+if not exist "%BASE_DIR%web\trainer_ui.html" (
+    echo [ERROR] No existe web\trainer_ui.html
     echo.
     pause
     exit /b 1
@@ -101,7 +101,7 @@ echo.
 echo Cierra esta ventana para detener el servidor.
 echo.
 
-"%PYTHON_EXE%" "%BASE_DIR%server.py"
+"%PYTHON_EXE%" "%BASE_DIR%scripts\python\server.py"
 
 echo.
 echo ================================================================

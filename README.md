@@ -35,3 +35,25 @@
    ```bash
    ./run_batch_cli.sh all
    ```
+
+---
+
+## 📁 Estructura del Proyecto
+
+```
+├── run_LoRAlab-Krea2.sh        # Interfaz web (lanzador principal)
+├── install_LoRAlab-Krea2.sh    # Instalación del entorno
+├── run_batch_cli.sh            # Modo por lote (CLI / headless)
+├── pre_cache_settings.json     # Configuración local (excluida del repo)
+├── train_settings.json
+├── assets/                     # Imágenes del proyecto
+├── web/                        # Interfaz web (trainer_ui.html)
+├── scripts/
+│   ├── python/                 # Pre-caché, entrenamiento, orquestador y backend
+│   ├── shell/                  # Utilidades .sh adicionales
+│   └── batch/                  # Utilidades .bat adicionales (Windows)
+├── cached_data_local/          # Latentes y embeddings cacheados (generado)
+└── output_local/               # LoRAs y checkpoints (generado)
+```
+
+> Los scripts de `scripts/python/` resuelven sus rutas contra la raíz del proyecto, así que pueden ejecutarse desde cualquier directorio.

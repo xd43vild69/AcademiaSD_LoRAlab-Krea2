@@ -69,14 +69,19 @@ logging.getLogger('werkzeug').setLevel(logging.ERROR)
 # CONFIGURACIÓN / CONFIGURATION
 # =============================================================================
 
+# BASE_DIR es scripts/python/ (donde vive este fichero); PROJECT_ROOT es la raíz
+# del proyecto, contra la que se resuelven datos, configuración y recursos web.
 BASE_DIR = Path(__file__).resolve().parent
-ASSETS_DIR = BASE_DIR / "assets"
+PROJECT_ROOT = BASE_DIR.parent.parent
 
-UI_FILE = BASE_DIR / "trainer_ui.html"
-LOGO_FILE = ASSETS_DIR / "logo.png" if (ASSETS_DIR / "logo.png").exists() else BASE_DIR / "logo.png"
+ASSETS_DIR = PROJECT_ROOT / "assets"
+WEB_DIR = PROJECT_ROOT / "web"
 
-PRECACHE_CONFIG = BASE_DIR / "pre_cache_settings.json"
-TRAIN_CONFIG = BASE_DIR / "train_settings.json"
+UI_FILE = WEB_DIR / "trainer_ui.html"
+LOGO_FILE = ASSETS_DIR / "logo.png" if (ASSETS_DIR / "logo.png").exists() else PROJECT_ROOT / "logo.png"
+
+PRECACHE_CONFIG = PROJECT_ROOT / "pre_cache_settings.json"
+TRAIN_CONFIG = PROJECT_ROOT / "train_settings.json"
 
 PRECACHE_SCRIPT = BASE_DIR / "1_pre_cache_krea2.py"
 TRAIN_SCRIPT = BASE_DIR / "2_train_lora_krea2.py"
@@ -141,7 +146,7 @@ def resolve_config_path(value, default):
     path = Path(str(value))
     if path.is_absolute():
         return path
-    return (BASE_DIR / path).resolve()
+    return (PROJECT_ROOT / path).resolve()
 
 
 def get_train_output_dir():
@@ -194,10 +199,10 @@ def get_status():
 def select_folder_native():
     try:
         data = request.get_json(force=True) or {}
-        initial_dir = data.get("initial_dir", str(BASE_DIR)).strip()
+        initial_dir = data.get("initial_dir", str(PROJECT_ROOT)).strip()
         
         if not initial_dir or not os.path.exists(initial_dir):
-            initial_dir = str(BASE_DIR)
+            initial_dir = str(PROJECT_ROOT)
 
         selected_path = None
 
@@ -303,13 +308,13 @@ def get_system_stats():
 
 @app.route("/api/browse-dir", methods=["GET"])
 def browse_dir():
-    requested_path = request.args.get("path", str(BASE_DIR))
+    requested_path = request.args.get("path", str(PROJECT_ROOT))
     try:
         target = Path(requested_path).resolve()
         if not target.exists() or not target.is_dir():
-            target = BASE_DIR
+            target = PROJECT_ROOT
     except Exception:
-        target = BASE_DIR
+        target = PROJECT_ROOT
 
     parent = str(target.parent) if target.parent != target else str(target)
     dirs = []
@@ -401,15 +406,15 @@ def export_lora():
 @app.route("/")
 def index():
     if not UI_FILE.exists():
-        return f"File not found / No se encuentra: trainer_ui.html in {BASE_DIR}", 404
-    return send_from_directory(str(BASE_DIR), UI_FILE.name)
+        return f"File not found / No se encuentra: trainer_ui.html in {WEB_DIR}", 404
+    return send_from_directory(str(WEB_DIR), UI_FILE.name)
 
 
 @app.route("/assets/<path:filename>")
 def serve_assets(filename):
     if ASSETS_DIR.exists():
         return send_from_directory(str(ASSETS_DIR), filename)
-    return send_from_directory(str(BASE_DIR), filename)
+    return send_from_directory(str(PROJECT_ROOT), filename)
 
 
 @app.route("/favicon.ico")
@@ -417,8 +422,8 @@ def serve_assets(filename):
 def serve_logo():
     if (ASSETS_DIR / "logo.png").exists():
         return send_from_directory(str(ASSETS_DIR), "logo.png")
-    if (BASE_DIR / "logo.png").exists():
-        return send_from_directory(str(BASE_DIR), "logo.png")
+    if (PROJECT_ROOT / "logo.png").exists():
+        return send_from_directory(str(PROJECT_ROOT), "logo.png")
     return "", 404
 
 
@@ -431,7 +436,7 @@ def get_settings():
     return jsonify({
         "pre_cache": read_json_file(PRECACHE_CONFIG, {}),
         "train": read_json_file(TRAIN_CONFIG, {}),
-        "base_dir": str(BASE_DIR)
+        "base_dir": str(PROJECT_ROOT)
     })
 
 
@@ -568,7 +573,7 @@ def run_script():
 
             process = subprocess.Popen(
                 command,
-                cwd=str(BASE_DIR),
+                cwd=str(PROJECT_ROOT),
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -776,7 +781,7 @@ if __name__ == "__main__":
     print("\n" + "=" * 70)
     print("  ACADEMIASD — KREA-2 LORA TRAINER WEB SERVER")
     print("=" * 70)
-    print(f"  Base Dir / Carpeta  : {BASE_DIR}")
+    print(f"  Base Dir / Carpeta  : {PROJECT_ROOT}")
     print(f"  Python Interpreter  : {sys.executable}")
     print(f"  URL                 : http://127.0.0.1:5000")
     print("=" * 70 + "\n")
