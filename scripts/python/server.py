@@ -779,6 +779,66 @@ def batch_caption():
         return jsonify({"status": "error", "error": str(exc)}), 500
 
 
+@app.route("/api/batch-replace-caption", methods=["POST"])
+def batch_replace_caption():
+    try:
+        data = request.get_json(force=True)
+        search_text = data.get("search_text", "")
+        replace_text = data.get("replace_text", "")
+        case_sensitive = bool(data.get("case_sensitive", True))
+        whole_word = bool(data.get("whole_word", True))
+        clean_commas = bool(data.get("clean_commas", True))
+        
+        if not search_text:
+            return jsonify({"status": "error", "error": "Search text is required / Se requiere texto a buscar."}), 400
+
+        dataset_dir = get_dataset_dir()
+        total_occurrences = 0
+        files_updated = 0
+
+        if dataset_dir.is_dir():
+            escaped_search = re.escape(search_text)
+            if whole_word:
+                pattern_str = r'(?<![a-zA-Z0-9_])' + escaped_search + r'(?![a-zA-Z0-9_])'
+            else:
+                pattern_str = escaped_search
+
+            flags = 0 if case_sensitive else re.IGNORECASE
+            pattern = re.compile(pattern_str, flags)
+
+            for file_path in dataset_dir.iterdir():
+                if file_path.is_file() and file_path.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"):
+                    txt_path = file_path.with_suffix(".txt")
+                    if txt_path.exists():
+                        try:
+                            original_text = txt_path.read_text(encoding="utf-8")
+                        except Exception:
+                            continue
+
+                        matches = len(pattern.findall(original_text))
+                        if matches > 0:
+                            total_occurrences += matches
+                            new_text = pattern.sub(replace_text, original_text)
+
+                            if clean_commas:
+                                new_text = re.sub(r'\s*,\s*,+', ',', new_text)
+                                new_text = re.sub(r'\s+,', ',', new_text)
+                                new_text = re.sub(r'\s*,\s*', ', ', new_text)
+                                new_text = re.sub(r'  +', ' ', new_text)
+                                new_text = new_text.strip(', ')
+
+                            txt_path.write_text(new_text, encoding="utf-8")
+                            files_updated += 1
+
+        return jsonify({
+            "status": "ok",
+            "occurrences_replaced": total_occurrences,
+            "files_updated": files_updated
+        })
+    except Exception as exc:
+        return jsonify({"status": "error", "error": str(exc)}), 500
+
+
 def open_browser():
     try:
         webbrowser.open("http://127.0.0.1:5000")

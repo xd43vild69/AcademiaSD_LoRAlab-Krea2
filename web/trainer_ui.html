@@ -971,6 +971,8 @@
                             onclick="toggleDatasetGrid()">Hide / Ocultar</button>
                         <button type="button" class="btn btn-warning btn-sm" onclick="addTriggerToAllCaptions()">+
                             Trigger All</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="openBatchReplaceModal()"
+                            title="Reemplazar palabra/texto en todo el dataset (F2)">🔍 Reemplazar (F2)</button>
                         <button type="button" class="btn btn-secondary btn-sm" onclick="loadDatasetInfo()">Refresh /
                             Actualizar</button>
                     </div>
@@ -1020,6 +1022,56 @@
                     Folder / Usar Carpeta</button>
                 <button type="button" class="btn btn-secondary btn-full" onclick="closeFolderModal()">Cancel /
                     Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Batch Replace Word in Captions (F2) -->
+    <div class="modal" id="batch-replace-modal" onclick="closeBatchReplaceModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:550px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="font-size:1.1rem; color:var(--accent); display:flex; align-items:center; gap:8px; margin:0;">
+                    🔍 Reemplazar Palabra en Captions <span style="font-size:0.75rem; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; color:#94a3b8;">F2</span>
+                </h3>
+                <span style="font-size:1.2rem; color:var(--text-muted); cursor:pointer; font-weight:bold;" onclick="closeBatchReplaceModal()">✕</span>
+            </div>
+
+            <div class="form-group" style="margin-top:5px;">
+                <label>Palabra / Texto a Buscar:</label>
+                <input type="text" id="replace-search-input" placeholder="Ej: 1girl" oninput="updateReplaceLiveStats()">
+            </div>
+
+            <div class="form-group">
+                <label>Reemplazar por:</label>
+                <input type="text" id="replace-target-input" placeholder="Ej: woman (dejar vacío para eliminar)" oninput="updateReplaceLiveStats()">
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:8px; background:#0f172a; padding:10px 12px; border-radius:6px; border:1px solid var(--panel-border);">
+                <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                    <input type="checkbox" id="replace-case-sensitive" checked onchange="updateReplaceLiveStats()">
+                    Sensible a mayúsculas / minúsculas (Case Sensitive)
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                    <input type="checkbox" id="replace-whole-word" checked onchange="updateReplaceLiveStats()">
+                    Coincidir solo palabra completa (Whole Word)
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                    <input type="checkbox" id="replace-clean-commas" checked>
+                    Limpiar comas y espacios sobrantes al eliminar
+                </label>
+            </div>
+
+            <div id="replace-live-stats" style="background:#0f172a; padding:12px; border-radius:8px; border:1px solid var(--panel-border); font-size:0.88rem; color:var(--text-muted); transition: all 0.2s ease;">
+                Ingresa un texto a buscar para calcular las coincidencias en el dataset.
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:5px;">
+                <button type="button" class="btn btn-warning btn-full" id="btn-execute-replace" onclick="executeBatchReplace()" disabled>
+                    🔄 Reemplazar en Todo el Dataset
+                </button>
+                <button type="button" class="btn btn-secondary btn-full" onclick="closeBatchReplaceModal()">
+                    Cancelar
+                </button>
             </div>
         </div>
     </div>
@@ -1641,6 +1693,142 @@
         function closeFolderModal(e) {
             document.getElementById('folder-modal').classList.remove('active');
         }
+
+        function openBatchReplaceModal() {
+            const modal = document.getElementById('batch-replace-modal');
+            modal.classList.add('active');
+            const input = document.getElementById('replace-search-input');
+            input.value = '';
+            document.getElementById('replace-target-input').value = '';
+            updateReplaceLiveStats();
+            setTimeout(() => input.focus(), 100);
+        }
+
+        function closeBatchReplaceModal(event) {
+            if (!event || event.target === document.getElementById('batch-replace-modal')) {
+                document.getElementById('batch-replace-modal').classList.remove('active');
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function updateReplaceLiveStats() {
+            const searchText = document.getElementById('replace-search-input').value;
+            const caseSensitive = document.getElementById('replace-case-sensitive').checked;
+            const wholeWord = document.getElementById('replace-whole-word').checked;
+            const btnExecute = document.getElementById('btn-execute-replace');
+            const statsDiv = document.getElementById('replace-live-stats');
+
+            if (!searchText || searchText === '') {
+                statsDiv.innerHTML = '<span style="color:var(--text-muted);">Ingresa un texto a buscar para calcular las coincidencias.</span>';
+                statsDiv.style.borderColor = 'var(--panel-border)';
+                btnExecute.disabled = true;
+                return;
+            }
+
+            try {
+                const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const patternStr = wholeWord ? `(?<![a-zA-Z0-9_])${escaped}(?![a-zA-Z0-9_])` : escaped;
+                const flags = caseSensitive ? 'g' : 'gi';
+                const regex = new RegExp(patternStr, flags);
+
+                let totalMatches = 0;
+                let affectedFiles = 0;
+
+                (allDatasetImages || []).forEach(img => {
+                    if (img.caption) {
+                        const matches = img.caption.match(regex);
+                        if (matches && matches.length > 0) {
+                            totalMatches += matches.length;
+                            affectedFiles++;
+                        }
+                    }
+                });
+
+                if (totalMatches > 0) {
+                    statsDiv.innerHTML = `<span style="color:#4ade80; font-weight:600;">✓ Coincidencias encontradas:</span> ` +
+                        `<strong>${totalMatches}</strong> apariciones en <strong>${affectedFiles}</strong> de ${allDatasetImages.length} imágenes.`;
+                    statsDiv.style.borderColor = '#4ade80';
+                    btnExecute.disabled = false;
+                } else {
+                    statsDiv.innerHTML = `<span style="color:#f87171;">✕ No se encontraron coincidencias</span> para "<strong>${escapeHtml(searchText)}</strong>".`;
+                    statsDiv.style.borderColor = '#f87171';
+                    btnExecute.disabled = true;
+                }
+            } catch (e) {
+                statsDiv.innerHTML = `<span style="color:#f87171;">Patrón de búsqueda inválido.</span>`;
+                btnExecute.disabled = true;
+            }
+        }
+
+        async function executeBatchReplace() {
+            const searchText = document.getElementById('replace-search-input').value;
+            const replaceText = document.getElementById('replace-target-input').value;
+            const caseSensitive = document.getElementById('replace-case-sensitive').checked;
+            const wholeWord = document.getElementById('replace-whole-word').checked;
+            const cleanCommas = document.getElementById('replace-clean-commas').checked;
+            const btnExecute = document.getElementById('btn-execute-replace');
+
+            if (!searchText) return;
+
+            btnExecute.disabled = true;
+            btnExecute.innerText = '⏳ Reemplazando...';
+
+            try {
+                const res = await fetch('/api/batch-replace-caption', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        search_text: searchText,
+                        replace_text: replaceText,
+                        case_sensitive: caseSensitive,
+                        whole_word: wholeWord,
+                        clean_commas: cleanCommas
+                    })
+                });
+
+                if (!res.ok) {
+                    let errMsg = `Servidor respondió con código HTTP ${res.status}.`;
+                    if (res.status === 404) {
+                        errMsg += ' La ruta /api/batch-replace-caption no fue encontrada. Por favor reinicia el servidor backend (server.py).';
+                    }
+                    throw new Error(errMsg);
+                }
+
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    closeBatchReplaceModal();
+                    alert(`✓ Reemplazo completado con éxito:\n\n- Ocurrencias cambiadas: ${data.occurrences_replaced}\n- Archivos actualizados: ${data.files_updated}`);
+                    loadDatasetInfo();
+                } else {
+                    alert(`Error: ${data.error || 'No se pudo realizar el reemplazo.'}`);
+                }
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            } finally {
+                btnExecute.innerText = '🔄 Reemplazar en Todo el Dataset';
+                btnExecute.disabled = false;
+            }
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F2') {
+                e.preventDefault();
+                const grid = document.getElementById('ds-grid');
+                if (grid && grid.classList.contains('hidden')) {
+                    toggleDatasetGrid();
+                }
+                openBatchReplaceModal();
+            }
+            if (e.key === 'Escape') {
+                const replaceModal = document.getElementById('batch-replace-modal');
+                if (replaceModal && replaceModal.classList.contains('active')) {
+                    closeBatchReplaceModal();
+                }
+            }
+        });
     </script>
 </body>
 
