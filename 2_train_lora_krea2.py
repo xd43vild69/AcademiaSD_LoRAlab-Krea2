@@ -37,11 +37,15 @@ try:
 except Exception:
     pass
 
+# Carpetas contenedoras: todo lo generado se agrupa aquí en vez de en la raíz.
+CACHE_ROOT  = "./cached_data_local"
+OUTPUT_ROOT = "./output_local"
+
 # ── DEFAULTS / VALORES POR DEFECTO ──────────────────────────────────────────
 DEFAULTS = {
     "model_id": "Krea-2-NF4",
-    "cache_dir": "./cached_data_krea2",
-    "output_dir": "./krea2_lora_output",
+    "cache_dir": f"{CACHE_ROOT}/default",
+    "output_dir": f"{OUTPUT_ROOT}/default",
     "total_steps": 1200,
     "batch_size": 1,
     "grad_accum_steps": 4,
@@ -119,10 +123,12 @@ if COMPACT_TEXT and BATCH_SIZE > 1:
     print("[!] compact_text requires batch_size 1; disabling / compact_text requiere batch_size 1; desactivado.")
     COMPACT_TEXT = False
 
-# Formato automático de carpetas según el nombre del proyecto
+# Formato automático de carpetas según el nombre del proyecto.
+# Sin project_name se respetan cache_dir/output_dir explícitos: así es como
+# run_progressive.py apunta cada fase a su subdir de resolución y a phaseN_*.
 if PROJECT_NAME:
-    CACHE_DIR  = f"./cached_data_krea2_{PROJECT_NAME}"
-    OUTPUT_DIR = f"./krea2_lora_output_{PROJECT_NAME}"
+    CACHE_DIR  = f"{CACHE_ROOT}/{PROJECT_NAME}"
+    OUTPUT_DIR = f"{OUTPUT_ROOT}/{PROJECT_NAME}"
 else:
     CACHE_DIR  = cfg.get("cache_dir",  DEFAULTS["cache_dir"])
     OUTPUT_DIR = cfg.get("output_dir", DEFAULTS["output_dir"])

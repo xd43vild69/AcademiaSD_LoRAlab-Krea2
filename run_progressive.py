@@ -33,6 +33,10 @@ TRAIN_SCRIPT = BASE_DIR / "2_train_lora_krea2.py"
 CONFIG_PATH = os.environ.get("TRAIN_SETTINGS_PATH", str(BASE_DIR / "train_settings.json"))
 PHASE_SETTINGS_DIR = BASE_DIR / ".progressive_phases"
 
+# Carpetas contenedoras: todo lo generado se agrupa aquí en vez de en la raíz.
+CACHE_ROOT = "./cached_data_local"
+OUTPUT_ROOT = "./output_local"
+
 # ── PRESETS DE FASES ─────────────────────────────────────────────────────────
 # label: subdir de la caché (lo genera el pre-cache con round(sqrt(area))).
 # portion: fracción de total_steps dedicada a la fase.
@@ -74,11 +78,11 @@ def derive_dirs(cfg):
     """Reproduce la lógica project_name → carpetas de los scripts."""
     project = str(cfg.get("project_name", "")).strip()
     if project:
-        cache_base = f"./cached_data_krea2_{project}"
-        output_base = f"./krea2_lora_output_{project}"
+        cache_base = f"{CACHE_ROOT}/{project}"
+        output_base = f"{OUTPUT_ROOT}/{project}"
     else:
-        cache_base = cfg.get("cache_dir", "./cached_data_krea2")
-        output_base = cfg.get("output_dir", "./krea2_lora_output")
+        cache_base = cfg.get("cache_dir", f"{CACHE_ROOT}/default")
+        output_base = cfg.get("output_dir", f"{OUTPUT_ROOT}/default")
     return cache_base, output_base
 
 

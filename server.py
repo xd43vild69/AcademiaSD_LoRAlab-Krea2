@@ -82,6 +82,10 @@ PRECACHE_SCRIPT = BASE_DIR / "1_pre_cache_krea2.py"
 TRAIN_SCRIPT = BASE_DIR / "2_train_lora_krea2.py"
 PROGRESSIVE_SCRIPT = BASE_DIR / "run_progressive.py"
 
+# Carpetas contenedoras: todo lo generado se agrupa aquí en vez de en la raíz.
+CACHE_ROOT = "cached_data_local"
+OUTPUT_ROOT = "output_local"
+
 app = Flask(__name__)
 
 active_process = None
@@ -143,9 +147,10 @@ def resolve_config_path(value, default):
 def get_train_output_dir():
     cfg = read_json_file(TRAIN_CONFIG, {})
     proj = cfg.get("project_name", "").strip()
+    default_output = f"{OUTPUT_ROOT}/default"
     if proj:
-        return resolve_config_path(f"krea2_lora_output_{proj}", "krea2_lora_output")
-    return resolve_config_path(cfg.get("output_dir"), "krea2_lora_output")
+        return resolve_config_path(f"{OUTPUT_ROOT}/{proj}", default_output)
+    return resolve_config_path(cfg.get("output_dir"), default_output)
 
 
 def get_dataset_dir():
@@ -438,8 +443,8 @@ def save_precache():
             return jsonify({"status": "error", "error": "JSON object required / Objeto JSON requerido."}), 400
         
         proj = data.get("project_name", "").strip()
-        cache_dir_name = f"cached_data_krea2_{proj}" if proj else "cached_data_krea2"
-        output_dir_name = f"krea2_lora_output_{proj}" if proj else "krea2_lora_output"
+        cache_dir_name = f"{CACHE_ROOT}/{proj}" if proj else f"{CACHE_ROOT}/default"
+        output_dir_name = f"{OUTPUT_ROOT}/{proj}" if proj else f"{OUTPUT_ROOT}/default"
 
         data["cache_dir"] = f"./{cache_dir_name}"
 
@@ -487,8 +492,8 @@ def save_train():
             return jsonify({"status": "error", "error": "JSON object required / Objeto JSON requerido."}), 400
         
         proj = data.get("project_name", "").strip()
-        cache_dir_name = f"cached_data_krea2_{proj}" if proj else "cached_data_krea2"
-        output_dir_name = f"krea2_lora_output_{proj}" if proj else "krea2_lora_output"
+        cache_dir_name = f"{CACHE_ROOT}/{proj}" if proj else f"{CACHE_ROOT}/default"
+        output_dir_name = f"{OUTPUT_ROOT}/{proj}" if proj else f"{OUTPUT_ROOT}/default"
 
         data["cache_dir"] = f"./{cache_dir_name}"
         data["output_dir"] = f"./{output_dir_name}"

@@ -738,7 +738,7 @@
 
                 <div class="form-group">
                     <label>Cache Folder / Carpeta Caché (Auto):</label>
-                    <input type="text" id="precache_cache_dir" value="./cached_data_krea2" readonly
+                    <input type="text" id="precache_cache_dir" value="./cached_data_local/default" readonly
                         title="Ruta informativa generada automáticamente">
                 </div>
 
@@ -811,7 +811,7 @@
 
                 <div class="form-group">
                     <label>Output Dir / Carpeta Salida (Auto):</label>
-                    <input type="text" id="train_output_dir" value="./krea2_lora_output" readonly
+                    <input type="text" id="train_output_dir" value="./output_local/default" readonly
                         title="Ruta informativa generada automáticamente">
                 </div>
 
@@ -1062,8 +1062,8 @@
 
         function updateProjectPaths() {
             const proj = document.getElementById('project_name').value.trim();
-            const cacheDir = proj ? `./cached_data_krea2_${proj}` : './cached_data_krea2';
-            const outputDir = proj ? `./krea2_lora_output_${proj}` : './krea2_lora_output';
+            const cacheDir = `./cached_data_local/${proj || 'default'}`;
+            const outputDir = `./output_local/${proj || 'default'}`;
 
             document.getElementById('precache_cache_dir').value = cacheDir;
             document.getElementById('train_output_dir').value = outputDir;

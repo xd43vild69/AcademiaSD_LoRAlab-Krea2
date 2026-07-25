@@ -25,22 +25,31 @@ Krea-2-NF4/
 # ==========================================
 dataset/
 datasets/
+cached_data_local/
 cached_data_krea2*/
 
 # ==========================================
 # Salidas de entrenamiento y Resultados (Outputs)
 # ==========================================
+output_local/
 krea2_lora_output*/
 output/
 outputs/
 samples/
 previews/
 
+# Settings temporales por fase (los genera run_progressive.py en cada corrida)
+.progressive_phases/
+
 # ==========================================
 # Configuraciones locales con datos/tokens privados
 # ==========================================
 pre_cache_settings.json
 train_settings.json
+
+# Variables de entorno (pueden contener HF_TOKEN u otras credenciales)
+.env
+.env.*
 
 # Excepciones: Mantener las plantillas de ejemplo
 !pre_cache_settings.json.example

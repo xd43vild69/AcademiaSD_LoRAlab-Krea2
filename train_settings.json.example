@@ -1,7 +1,7 @@
 {
   "model_id": "Krea-2-NF4",
   "project_name": "mi_proyecto",
-  "output_dir": "./krea2_lora_output",
+  "output_dir": "./output_local/mi_proyecto",
   "total_steps": 1200,
   "batch_size": 1,
   "grad_accum_steps": 4,

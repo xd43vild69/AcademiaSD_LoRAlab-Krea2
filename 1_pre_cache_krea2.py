@@ -22,11 +22,14 @@ try:
 except Exception:
     pass
 
+# Carpeta contenedora de todo lo que genera el pre-caché (una sola en la raíz).
+CACHE_ROOT = "./cached_data_local"
+
 # ── DEFAULTS / VALORES POR DEFECTO ──────────────────────────────────────────
 DEFAULTS = {
     "model_id": "Krea-2-NF4",
     "dataset_path": "./dataset",
-    "cache_dir": "./cached_data_krea2",
+    "cache_dir": f"{CACHE_ROOT}/default",
     "target_area": 512 * 512,
     "max_side": 1280,
     "multiple": 16,
@@ -66,9 +69,12 @@ def res_label(area):
     """Etiqueta corta del subdir a partir del área (ej. 589824 -> '768')."""
     return str(int(round(math.sqrt(area))))
 
-# Formato automático de carpeta de caché según nombre del proyecto
+# Formato automático de carpeta de caché según nombre del proyecto.
+# Todo lo generado se agrupa bajo CACHE_ROOT para no ensuciar la raíz.
+# Sin project_name se respeta un cache_dir explícito (lo usa run_progressive.py
+# para apuntar al subdirectorio de resolución de cada fase).
 if PROJECT_NAME:
-    CACHE_DIR = f"./cached_data_krea2_{PROJECT_NAME}"
+    CACHE_DIR = f"{CACHE_ROOT}/{PROJECT_NAME}"
 else:
     CACHE_DIR = cfg.get("cache_dir", DEFAULTS["cache_dir"])
 
