@@ -446,7 +446,11 @@ def save_precache():
         data = request.get_json(force=True)
         if not isinstance(data, dict):
             return jsonify({"status": "error", "error": "JSON object required / Objeto JSON requerido."}), 400
-        
+
+        # Merge, no reemplazo: la UI sólo envía las claves que sabe pintar, así que un
+        # write directo borraba en silencio todo lo demás que el script sí lee.
+        data = {**read_json_file(PRECACHE_CONFIG, {}), **data}
+
         proj = data.get("project_name", "").strip()
         cache_dir_name = f"{CACHE_ROOT}/{proj}" if proj else f"{CACHE_ROOT}/default"
         output_dir_name = f"{OUTPUT_ROOT}/{proj}" if proj else f"{OUTPUT_ROOT}/default"
@@ -495,7 +499,12 @@ def save_train():
         data = request.get_json(force=True)
         if not isinstance(data, dict):
             return jsonify({"status": "error", "error": "JSON object required / Objeto JSON requerido."}), 400
-        
+
+        # Merge, no reemplazo: la UI construye un objeto de claves fijas, así que un write
+        # directo borraba warmup_steps, min_lr_ratio, weight_decay, max_grad_norm,
+        # timestep_sampling, model_id, gradient_checkpointing, preview_steps/cfg y hf_token.
+        data = {**read_json_file(TRAIN_CONFIG, {}), **data}
+
         proj = data.get("project_name", "").strip()
         cache_dir_name = f"{CACHE_ROOT}/{proj}" if proj else f"{CACHE_ROOT}/default"
         output_dir_name = f"{OUTPUT_ROOT}/{proj}" if proj else f"{OUTPUT_ROOT}/default"

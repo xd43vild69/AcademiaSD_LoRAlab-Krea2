@@ -1,0 +1,73 @@
+{
+  "_comment": "Copia a train_advanced.json. Estas claves NO las toca la UI web (que reescribe train_settings.json con un objeto de claves fijas). Precedencia: train_settings.json > train_advanced.json > preset > defaults. Todo es opt-in: con este fichero ausente el entrenamiento es idéntico al histórico. El bloque EFFECTIVE CONFIG que se imprime al arrancar muestra el origen de cada valor.",
+
+  "_preset": "stable_v2 activa de golpe el conjunto recomendado: sampler epoch, lora_dtype fp32, eps 1e-6, betas [0.9,0.99], targets en alta precisión, loss por ventana, 5 checkpoints, guardas NaN/OOM. Las claves explícitas de abajo siguen ganando.",
+  "preset": "",
+
+  "_A1": "Precisión. fp32 evita que los updates pequeños se redondeen a cero en bf16 (epsilon relativo ~0.0039). Cuesta ~+235 MB de VRAM más el casteo de activaciones: verifica la fase 1024 antes de dejarlo fijo.",
+  "lora_dtype": "bf16",
+  "high_precision_targets": false,
+
+  "_A2": "epoch = cada imagen se ve una vez por época. legacy = muestreo uniforme por bucket, que da a una imagen sola hasta 16x más pasos que a una del bucket grande.",
+  "sampler": "legacy",
+
+  "_A3_A8": "Guardas. Un solo inf hace que clip_grad_norm_ escale todos los gradientes a NaN y AdamW los escriba de forma permanente en sus momentos.",
+  "nan_guard": true,
+  "nan_abort_after": 20,
+  "max_loss": 0.0,
+  "oom_guard": true,
+  "oom_abort_after": 3,
+
+  "_A4": "abort se niega a reiniciar en silencio desde el paso 0 cuando el checkpoint existe pero no se puede restaurar.",
+  "resume_on_corrupt": "abort",
+
+  "_A5_A7": "warmup_units aclara que total_steps son micro-pasos pero el schedule va en updates del optimizador. eps 1e-6 y betas [0.9,0.99] van mejor en runs cortos: con 750 updates, beta2=0.999 tiene un horizonte de ~1000 y nunca calienta.",
+  "warmup_units": "updates",
+  "optimizer": "adamw8bit_paged",
+  "optimizer_eps": 1e-8,
+  "optimizer_betas": [0.9, 0.999],
+
+  "_B1": "content sesga a sigma baja (detalle y parecido), style a sigma alta (composición y color). La ponderación bell reequilibra los micro-batches dentro de la ventana de acumulación.",
+  "timestep_weighting": "none",
+  "content_or_style": "balanced",
+  "logit_normal_mu": 0.0,
+  "logit_normal_sigma": 1.0,
+  "sigma_min": 0.0,
+  "sigma_max": 1.0,
+
+  "_B3": "noise_offset arregla el SNR terminal no nulo de DDPM. En rectified flow sigma=1 ya es ruido puro en distribución, así que el problema que resuelve no existe aquí: déjalo en 0.",
+  "noise_offset": 0.0,
+
+  "_B2": "El LoRA exportado y los previews usan los pesos EMA; el resume_checkpoint conserva los crudos. Avisa si el horizonte del decay supera un tercio del run.",
+  "use_ema": false,
+  "ema_decay": 0.99,
+  "ema_device": "cpu",
+
+  "_B4": "cosine | constant | linear | cosine_with_restarts | step",
+  "lr_scheduler": "cosine",
+  "lr_num_cycles": 3,
+  "lr_step_gamma": 0.5,
+  "lr_step_count": 4,
+
+  "_C1": "Sigmas y ruido fijos por imagen: convierte un escalar ruidoso en una curva legible para decidir qué checkpoint es el bueno. Con menos de ~30 imágenes usa val_cache_dir en vez de val_split.",
+  "val_split": 0.0,
+  "val_cache_dir": "",
+  "validate_every": 0,
+  "validation_sigmas": [0.25, 0.5, 0.75, 1.0],
+  "val_seed": 1234,
+
+  "_C2_C3_C4": "train_log.csv guarda la loss cruda y la sigma de cada paso, así que puedes agrupar por decil de sigma offline. ss_network_alpha importa: sin él un loader asume alpha=rank y aplica el LoRA a media fuerza.",
+  "loss_display": "cumulative",
+  "loss_window": 100,
+  "csv_log": true,
+  "max_checkpoints_to_keep": 0,
+  "export_metadata": true,
+  "export_alpha_tensors": false,
+
+  "_C5": "Requiere sample_prompts en pre_cache_settings.json y re-ejecutar el Pre-Caché.",
+  "preview_source": "caption",
+  "preview_walk_seed": false,
+
+  "_D3": "Útil a 0.05-0.10 en LoRAs de estilo. Para un LoRA de personaje con trigger word suele ser contraproducente: le enseña a dispararse incondicionalmente.",
+  "caption_dropout_rate": 0.0
+}

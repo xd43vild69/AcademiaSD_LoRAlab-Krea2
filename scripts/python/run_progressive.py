@@ -105,6 +105,20 @@ def main():
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         cfg = json.load(f)
 
+    # Sidecar avanzado: se congela en los JSON de fase para que cada
+    # .progressive_phases/*.json quede autodescriptivo y reproducible aunque
+    # train_advanced.json cambie a mitad del run. train_settings.json manda.
+    advanced_path = os.environ.get("TRAIN_ADVANCED_PATH",
+                                   os.path.join(str(PROJECT_ROOT), "train_advanced.json"))
+    if os.path.exists(advanced_path):
+        try:
+            with open(advanced_path, "r", encoding="utf-8") as f:
+                adv = json.load(f)
+            cfg = {**adv, **cfg}
+            print(f"[OK] Advanced settings merged from {advanced_path} ({len(adv)} keys)")
+        except Exception as exc:
+            print(f"[!] Could not read {advanced_path}: {exc} — ignoring / ignorando.")
+
     preset = str(cfg.get("progressive", "off")).strip().lower()
     if preset in ("off", "", "none"):
         print("[!] 'progressive' is off; nothing to orchestrate. Run the trainer directly.")

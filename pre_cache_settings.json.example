@@ -1,11 +1,22 @@
 {
   "model_id": "Krea-2-NF4",
   "dataset_path": "./dataset",
+  "cache_dir": "./cached_data_local/mi_proyecto",
   "target_area": 262144,
   "max_side": 1280,
   "multiple": 16,
   "max_seq_len": 128,
   "project_name": "mi_proyecto",
   "trigger_word": "",
-  "hf_token": ""
+  "hf_token": "",
+
+  "resolutions": [],
+
+  "cache_key": "mtime",
+  "prune_orphans": "warn",
+  "force_recache": false,
+
+  "flip_x": false,
+
+  "sample_prompts": []
 }

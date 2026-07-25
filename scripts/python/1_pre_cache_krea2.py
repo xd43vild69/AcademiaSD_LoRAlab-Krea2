@@ -10,6 +10,7 @@ import os
 import gc
 import math
 import json
+import hashlib
 import torch
 import torchvision.transforms.functional as F_vision
 from PIL import Image
@@ -48,7 +49,20 @@ DEFAULTS = {
     "project_name": "",
     "trigger_word": "",
     "resolutions": [],
+
+    # ── D1: manifiesto e invalidación de caché ───────────────────────────────
+    "cache_key": "mtime",        # "mtime" | "sha1"
+    "prune_orphans": "warn",     # "warn" | "delete" | "off"
+    "force_recache": False,
+    # ── D2: aumento por espejado ─────────────────────────────────────────────
+    "flip_x": False,
+    # ── C5: prompts de preview ───────────────────────────────────────────────
+    "sample_prompts": [],
 }
+
+# Se incrementa cuando cambia la normalización o el empaquetado de latentes, para
+# invalidar automáticamente todas las cachés existentes.
+LATENT_VERSION = 1
 
 # ── CARGAR CONFIGURACIÓN / LOAD CONFIG ──────────────────────────────────────
 CONFIG_PATH = os.environ.get("PRECACHE_SETTINGS_PATH",
@@ -80,6 +94,19 @@ PROJECT_NAME = cfg.get("project_name", "").strip()
 # el dataset a cada una en un subdirectorio {label}/. Si está vacía, se usa la
 # resolución única de 'target_area' (comportamiento clásico, retrocompatible).
 RESOLUTIONS = cfg.get("resolutions", DEFAULTS["resolutions"]) or []
+
+CACHE_KEY     = str(cfg.get("cache_key", DEFAULTS["cache_key"])).strip().lower()
+PRUNE_ORPHANS = str(cfg.get("prune_orphans", DEFAULTS["prune_orphans"])).strip().lower()
+FORCE_RECACHE = bool(cfg.get("force_recache", DEFAULTS["force_recache"]))
+FLIP_X        = bool(cfg.get("flip_x", DEFAULTS["flip_x"]))
+SAMPLE_PROMPTS = list(cfg.get("sample_prompts", DEFAULTS["sample_prompts"]) or [])
+
+if CACHE_KEY not in ("mtime", "sha1"):
+    print(f"⚠ Invalid cache_key '{CACHE_KEY}'. Using 'mtime' / usando 'mtime'.")
+    CACHE_KEY = "mtime"
+if PRUNE_ORPHANS not in ("warn", "delete", "off"):
+    print(f"⚠ Invalid prune_orphans '{PRUNE_ORPHANS}'. Using 'warn' / usando 'warn'.")
+    PRUNE_ORPHANS = "warn"
 
 
 def res_label(area):
@@ -115,6 +142,11 @@ else:
 print(f"  Max Side / Lado Máximo      : {MAX_SIDE}")
 print(f"  Multiple / Múltiplo         : {MULTIPLE}")
 print(f"  Max Seq Len / Long. Sec.    : {MAX_SEQ_LEN}")
+print(f"  Cache key / Invalidación    : {CACHE_KEY} (prune_orphans={PRUNE_ORPHANS}"
+      f"{', force_recache' if FORCE_RECACHE else ''})")
+print(f"  Flip augmentation / Espejado: {'ON (duplica el dataset)' if FLIP_X else 'OFF'}")
+if SAMPLE_PROMPTS:
+    print(f"  Sample prompts / Previews   : {len(SAMPLE_PROMPTS)}")
 
 os.makedirs(DATASET_PATH, exist_ok=True)
 os.makedirs(CACHE_DIR, exist_ok=True)
@@ -141,6 +173,93 @@ def bucket_size(w: int, h: int, area=None):
         bw = max(MULTIPLE, int(bw * s) // MULTIPLE * MULTIPLE)
         bh = max(MULTIPLE, int(bh * s) // MULTIPLE * MULTIPLE)
     return bw, bh
+
+
+# ── D1: MANIFIESTO DE CACHÉ / CACHE MANIFEST ────────────────────────────────
+
+def manifest_config():
+    """Ajustes que, si cambian, invalidan todos los latentes ya cacheados."""
+    return {
+        "multiple": MULTIPLE,
+        "max_side": MAX_SIDE,
+        "max_seq_len": MAX_SEQ_LEN,
+        "trigger_word": TRIGGER_WORD,
+        "flip_x": FLIP_X,
+        "latent_version": LATENT_VERSION,
+    }
+
+
+def load_manifest(out_dir):
+    path = os.path.join(out_dir, "cache_manifest.json")
+    if not os.path.exists(path):
+        return {"version": 1, "config": {}, "entries": {}}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if data.get("config") != manifest_config():
+            print(f"   [i] Cache config changed for {os.path.basename(out_dir)}; "
+                  f"re-encoding all / la configuración cambió; se reencoda todo.")
+            return {"version": 1, "config": {}, "entries": {}}
+        return data
+    except Exception:
+        return {"version": 1, "config": {}, "entries": {}}
+
+
+def save_manifest(out_dir, entries):
+    data = {"version": 1, "config": manifest_config(), "entries": entries}
+    path = os.path.join(out_dir, "cache_manifest.json")
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, path)
+
+
+def file_fingerprint(path):
+    """Huella de la imagen fuente: mtime+size (rápido) o sha1 (robusto ante copias)."""
+    stat = os.stat(path)
+    if CACHE_KEY == "sha1":
+        digest = hashlib.sha1()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                digest.update(chunk)
+        return {"sha1": digest.hexdigest(), "src_size": stat.st_size}
+    return {"src_mtime": int(stat.st_mtime), "src_size": stat.st_size}
+
+
+def caption_fingerprint(text):
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()
+
+
+def prune_orphans(out_dir, valid_names):
+    """Latentes de imágenes borradas o renombradas.
+
+    Sin esto se quedaban en la caché para siempre y el entrenador los seguía
+    entrenando en silencio; con el sampler por épocas además tendrían un turno
+    garantizado cada época.
+    """
+    present = {f[:-len("_latent.pt")] for f in os.listdir(out_dir)
+               if f.endswith("_latent.pt") and not f.startswith(".")}
+    orphans = sorted(present - set(valid_names))
+    if not orphans:
+        return
+    label = os.path.basename(out_dir)
+    if PRUNE_ORPHANS == "delete":
+        for name in orphans:
+            for suffix in ("_latent.pt", "_embed.pt", "_mask.pt"):
+                try:
+                    os.remove(os.path.join(out_dir, f"{name}{suffix}"))
+                except OSError:
+                    pass
+        print(f"   [OK] Pruned {len(orphans)} orphan entries from {label} / eliminados.")
+    elif PRUNE_ORPHANS == "warn":
+        print(f"\n[!] {len(orphans)} orphan cache entries in {label} "
+              f"(source image deleted or renamed) / huérfanos:")
+        for name in orphans[:10]:
+            print(f"      {name}")
+        if len(orphans) > 10:
+            print(f"      ... and {len(orphans) - 10} more")
+        print("[!] They will still be trained on. Set prune_orphans='delete' to remove them "
+              "/ se seguirán entrenando.")
 
 
 def ensure_model_downloaded(local_path, repo_id):
@@ -245,6 +364,10 @@ def preprocess_krea2():
         free_vram(img_tensor, z)
         return bw, bh, latent
 
+    manifests = {out_dir: ({} if FORCE_RECACHE else load_manifest(out_dir))
+                 for out_dir, _ in targets}
+    reused = encoded = 0
+
     with torch.inference_mode():
         # El embed negativo es independiente de la resolución: se guarda en cada caché.
         neg_embed, neg_mask = pipe.encode_prompt(prompt="", max_sequence_length=MAX_SEQ_LEN)
@@ -253,44 +376,118 @@ def preprocess_krea2():
             torch.save(neg_mask.cpu(),  os.path.join(out_dir, "_neg_mask.pt"))
         del neg_embed, neg_mask
 
+        # ── C5: prompts de preview ──────────────────────────────────────────
+        # El entrenador carga la pipeline con text_encoder=None y no puede
+        # codificar texto arbitrario, así que se pre-codifican aquí igual que el
+        # embed negativo. Coste cero de VRAM en el entrenamiento.
+        for out_dir, _ in targets:
+            for old in os.listdir(out_dir):
+                if old.startswith("_sample") and old.endswith((".pt", ".json")):
+                    os.remove(os.path.join(out_dir, old))
+        for i, item in enumerate(SAMPLE_PROMPTS):
+            spec = {"prompt": item} if isinstance(item, str) else dict(item)
+            text = str(spec.get("prompt", "")).strip()
+            if not text:
+                continue
+            if TRIGGER_WORD and TRIGGER_WORD.lower() not in text.lower():
+                text = f"{TRIGGER_WORD}, {text}".strip(", ")
+            s_emb, s_msk = pipe.encode_prompt(prompt=text, max_sequence_length=MAX_SEQ_LEN)
+            spec["prompt"] = text
+            for out_dir, _ in targets:
+                torch.save(s_emb.cpu(), os.path.join(out_dir, f"_sample{i}_embed.pt"))
+                torch.save(s_msk.cpu(), os.path.join(out_dir, f"_sample{i}_mask.pt"))
+                with open(os.path.join(out_dir, f"_sample{i}_meta.json"), "w", encoding="utf-8") as f:
+                    json.dump(spec, f, indent=2, ensure_ascii=False)
+            del s_emb, s_msk
+            print(f"   [OK] Sample prompt {i} cached / cacheado: {text[:60]}")
+
         for idx, archivo in enumerate(archivos_img, 1):
             nombre_base = os.path.splitext(archivo)[0]
             ruta_texto  = os.path.join(DATASET_PATH, f"{nombre_base}.txt")
-            print(f"[{idx}/{len(archivos_img)}] Processing / Procesando: {archivo}")
+            ruta_img    = os.path.join(DATASET_PATH, archivo)
 
-            try:
-                img = Image.open(os.path.join(DATASET_PATH, archivo)).convert("RGB")
-            except Exception as err:
-                print(f"[!] Warning: Cannot open image / No se pudo abrir la imagen '{archivo}': {err}")
-                continue
-
-            # ── 1. TEXTO → EMBEDDINGS (una sola vez; es independiente de la resolución) ──
             prompt = ""
             if os.path.exists(ruta_texto):
                 with open(ruta_texto, "r", encoding="utf-8") as f:
                     prompt = f.read().strip()
-
             if TRIGGER_WORD and TRIGGER_WORD.lower() not in prompt.lower():
                 prompt = f"{TRIGGER_WORD}, {prompt}".strip(", ")
 
+            # ── D1: ¿se puede reutilizar lo ya cacheado? ────────────────────
+            entry = dict(file_fingerprint(ruta_img))
+            entry["caption_sha1"] = caption_fingerprint(prompt)
+
+            def is_cached(out_dir):
+                previous = manifests[out_dir].get("entries", {}).get(nombre_base)
+                if previous is None:
+                    return False
+                if {k: previous.get(k) for k in entry} != entry:
+                    return False
+                names = [nombre_base] + ([f"{nombre_base}__flip"] if FLIP_X else [])
+                return all(os.path.exists(os.path.join(out_dir, f"{n}{suffix}"))
+                           for n in names for suffix in ("_latent.pt", "_embed.pt", "_mask.pt"))
+
+            pending = [(out_dir, area) for out_dir, area in targets if not is_cached(out_dir)]
+            if not pending:
+                reused += 1
+                print(f"[{idx}/{len(archivos_img)}] Up to date / Sin cambios: {archivo}")
+                for out_dir, _ in targets:
+                    manifests[out_dir].setdefault("entries", {})[nombre_base] = entry
+                continue
+
+            print(f"[{idx}/{len(archivos_img)}] Processing / Procesando: {archivo}")
+            try:
+                img = Image.open(ruta_img).convert("RGB")
+            except Exception as err:
+                print(f"[!] Warning: Cannot open image / No se pudo abrir la imagen '{archivo}': {err}")
+                continue
+
+            # ── 1. TEXTO → EMBEDDINGS (independiente de la resolución) ──────
             embeds, mask = pipe.encode_prompt(prompt=prompt, max_sequence_length=MAX_SEQ_LEN)
             embeds_cpu, mask_cpu = embeds.cpu(), mask.cpu()
             del embeds, mask
 
             # ── 2. IMAGEN → LATENTES (VAE), una vez por resolución ──────────
-            sizes = []
-            for out_dir, area in targets:
-                bw, bh, latent = vae_latent(img, area)
-                torch.save(latent, os.path.join(out_dir, f"{nombre_base}_latent.pt"))
-                torch.save(embeds_cpu, os.path.join(out_dir, f"{nombre_base}_embed.pt"))
-                torch.save(mask_cpu,   os.path.join(out_dir, f"{nombre_base}_mask.pt"))
-                sizes.append(f"{bw}x{bh}")
-                free_vram(latent)
+            # D2: el espejado se cachea como una entrada más (`nombre__flip`). El
+            # entrenador la recoge en su escaneo de directorio sin cambio alguno,
+            # y el sampler por épocas garantiza que se vean original y espejo.
+            variants = [("", img)]
+            if FLIP_X:
+                variants.append(("__flip", img.transpose(Image.FLIP_LEFT_RIGHT)))
 
-            print(f"   [OK] {' · '.join(sizes)} | Latents & Embeddings cached / Latentes y embeddings cacheados.")
+            sizes = []
+            for out_dir, area in pending:
+                for suffix, variant in variants:
+                    bw, bh, latent = vae_latent(variant, area)
+                    name = f"{nombre_base}{suffix}"
+                    torch.save(latent,     os.path.join(out_dir, f"{name}_latent.pt"))
+                    torch.save(embeds_cpu, os.path.join(out_dir, f"{name}_embed.pt"))
+                    torch.save(mask_cpu,   os.path.join(out_dir, f"{name}_mask.pt"))
+                    free_vram(latent)
+                sizes.append(f"{bw}x{bh}")
+
+            for out_dir, _ in targets:
+                manifests[out_dir].setdefault("entries", {})[nombre_base] = entry
+            encoded += 1
+            flip_note = " (+flip)" if FLIP_X else ""
+            print(f"   [OK] {' · '.join(sizes)}{flip_note} | Latents & Embeddings cached "
+                  f"/ Latentes y embeddings cacheados.")
+
+    # El manifiesto se reconstruye a partir de las imágenes realmente presentes:
+    # arrastrar las entradas antiguas haría que una imagen borrada o renombrada
+    # siguiera contando como válida y su latente nunca se reportase como huérfano.
+    present_names = {os.path.splitext(f)[0] for f in archivos_img}
+    for out_dir, _ in targets:
+        entries = {name: data
+                   for name, data in manifests[out_dir].get("entries", {}).items()
+                   if name in present_names}
+        save_manifest(out_dir, entries)
+        valid = list(entries) + ([f"{n}__flip" for n in entries] if FLIP_X else [])
+        prune_orphans(out_dir, valid)
 
     free_vram(pipe)
-    print("\n✓ Pre-caching finished! VRAM freed / ¡Pre-caché finalizado! VRAM liberada.")
+    print(f"\n✓ Pre-caching finished! {encoded} encoded, {reused} reused, VRAM freed "
+          f"/ ¡Pre-caché finalizado! {encoded} codificadas, {reused} reutilizadas.")
 
 
 if __name__ == "__main__":
