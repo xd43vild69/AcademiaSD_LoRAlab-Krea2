@@ -80,6 +80,7 @@ TRAIN_CONFIG = BASE_DIR / "train_settings.json"
 
 PRECACHE_SCRIPT = BASE_DIR / "1_pre_cache_krea2.py"
 TRAIN_SCRIPT = BASE_DIR / "2_train_lora_krea2.py"
+PROGRESSIVE_SCRIPT = BASE_DIR / "run_progressive.py"
 
 app = Flask(__name__)
 
@@ -156,6 +157,12 @@ def get_script_for_name(script_name):
     if script_name == "precache":
         return PRECACHE_SCRIPT
     if script_name == "train":
+        # En modo progresivo, el botón Train lanza el orquestador de fases en vez
+        # del entrenador único. La decisión sale de la config guardada.
+        cfg = read_json_file(TRAIN_CONFIG, {})
+        preset = str(cfg.get("progressive", "off")).strip().lower()
+        if preset not in ("off", "", "none"):
+            return PROGRESSIVE_SCRIPT
         return TRAIN_SCRIPT
     return None
 
@@ -458,7 +465,13 @@ def save_precache():
             train_cfg["output_dir"] = f"./{output_dir_name}"
         if "trigger_word" in data:
             train_cfg["trigger_word"] = data["trigger_word"]
-        
+        # Mantener coherente el modo progresivo: el botón Train lo lee de train_settings.
+        res = data.get("resolutions")
+        if isinstance(res, list):
+            train_cfg["progressive"] = ("512_768_1024" if len(res) == 3
+                                        else "768_1024" if len(res) == 2
+                                        else "off")
+
         write_json_file(TRAIN_CONFIG, train_cfg)
 
         return jsonify({"status": "ok", "file": saved_files[0], "all_saved": saved_files})

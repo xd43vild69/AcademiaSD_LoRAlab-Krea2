@@ -63,10 +63,14 @@ DEFAULTS = {
     "trigger_word": "",
     "lora_target": "all",
     "compact_text": True,
+    "init_lora_from": "",
+    "gradient_checkpointing": True,
 }
 
 # ── CARGAR CONFIGURACIÓN / LOAD CONFIG ──────────────────────────────────────
-CONFIG_PATH = "train_settings.json"
+# El orquestador de resolución progresiva pasa un fichero por fase vía esta
+# env-var para no pisar el train_settings.json del usuario.
+CONFIG_PATH = os.environ.get("TRAIN_SETTINGS_PATH", "train_settings.json")
 
 if os.path.exists(CONFIG_PATH):
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -98,6 +102,8 @@ TRIGGER_WORD      = cfg.get("trigger_word", "")
 PROJECT_NAME      = cfg.get("project_name", "").strip()
 LORA_TARGET       = str(cfg.get("lora_target", DEFAULTS["lora_target"])).strip().lower()
 COMPACT_TEXT      = bool(cfg.get("compact_text", DEFAULTS["compact_text"]))
+INIT_LORA_FROM    = str(cfg.get("init_lora_from", DEFAULTS["init_lora_from"])).strip()
+GRAD_CHECKPOINTING = bool(cfg.get("gradient_checkpointing", DEFAULTS["gradient_checkpointing"]))
 
 if LORA_TARGET not in ("all", "attn", "attn+ff"):
     print(f"[!] Invalid lora_target '{LORA_TARGET}'. Using 'all' / lora_target inválido. Usando 'all'.")
@@ -132,6 +138,9 @@ print(f"  LoRA Rank/Alpha          : {LORA_RANK}/{LORA_ALPHA}")
 print(f"  LoRA Target / Capas      : {LORA_TARGET}")
 print(f"  Batch / Grad Accum       : {BATCH_SIZE}/{GRAD_ACCUM_STEPS}")
 print(f"  Compact Text / Compactar : {'ON' if COMPACT_TEXT else 'OFF'}")
+print(f"  Grad Checkpointing       : {'ON' if GRAD_CHECKPOINTING else 'OFF'}")
+if INIT_LORA_FROM:
+    print(f"  Init LoRA from / Fase prev: {INIT_LORA_FROM}")
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 RESUME_DIR = os.path.join(OUTPUT_DIR, "resume_checkpoint")
@@ -492,7 +501,12 @@ def train_krea2():
         free_vram()
         print(f"Transformer 12B pinned in VRAM. Usage / Uso: {torch.cuda.memory_allocated()/1e9:.1f} GB")
 
-    transformer.enable_gradient_checkpointing()
+    if GRAD_CHECKPOINTING:
+        transformer.enable_gradient_checkpointing()
+    else:
+        # Sin recompute: más rápido pero más VRAM de activaciones. Sólo apto en las
+        # fases de baja resolución donde la VRAM sobra (lo decide el orquestador).
+        print("Gradient checkpointing OFF (faster, more VRAM) / Checkpointing desactivado.")
 
     all_linears = [name for name, m in transformer.named_modules()
                    if isinstance(m, (torch.nn.Linear, bnb.nn.Linear4bit))]
@@ -548,10 +562,15 @@ def train_krea2():
     optimizer = bnb.optim.PagedAdamW8bit(trainable, lr=LR, weight_decay=WEIGHT_DECAY)
 
     def lr_at(step):
-        if step < WARMUP_STEPS:
-            return LR * step / max(1, WARMUP_STEPS)
-        prog = (step - WARMUP_STEPS) / max(1, TOTAL_STEPS - WARMUP_STEPS)
-        return LR * (MIN_LR_RATIO + (1 - MIN_LR_RATIO) * 0.5 * (1 + math.cos(math.pi * prog)))
+        # El LR sólo se aplica en actualizaciones reales del optimizador (1 de cada
+        # GRAD_ACCUM_STEPS pasos de bucle), así que el schedule se mide en updates,
+        # no en pasos de bucle. WARMUP_STEPS se interpreta como updates del optimizador.
+        update = step / max(1, GRAD_ACCUM_STEPS)
+        total_updates = max(1, TOTAL_STEPS / max(1, GRAD_ACCUM_STEPS))
+        if update < WARMUP_STEPS:
+            return LR * update / max(1, WARMUP_STEPS)
+        prog = (update - WARMUP_STEPS) / max(1e-9, total_updates - WARMUP_STEPS)
+        return LR * (MIN_LR_RATIO + (1 - MIN_LR_RATIO) * 0.5 * (1 + math.cos(math.pi * min(1.0, prog))))
 
     # ── RESTAURACIÓN EXACTA DE CHECKPOINT / CHECKPOINT RESUME ─────────────────
     start_step = 0
@@ -570,6 +589,23 @@ def train_krea2():
             print(f"[!] Warning reading checkpoint / Advertencia al leer checkpoint: {e}")
             start_step = 0
         print("=" * 65)
+
+    # ── HAND-OFF ENTRE FASES (resolución progresiva) ──────────────────────────
+    # Cuando no hay checkpoint propio de esta fase pero se indica init_lora_from,
+    # se cargan SÓLO los pesos del adapter de la fase anterior. El optimizador
+    # queda fresco (momentos de Adam reiniciados) y start_step=0: cada fase re-warmea
+    # sobre la nueva escala de gradientes en vez de arrastrar la inercia anterior.
+    if start_step == 0 and INIT_LORA_FROM:
+        prev_adapter = os.path.join(INIT_LORA_FROM, "adapter_model.safetensors")
+        if os.path.exists(prev_adapter):
+            print("=" * 65)
+            print(f"Phase hand-off: loading LoRA weights from previous phase / Cargando LoRA de la fase previa:\n  {prev_adapter}")
+            with open(prev_adapter, "rb") as f:
+                set_peft_model_state_dict(model, load(f.read()))
+            print("[OK] LoRA initialized from previous phase; optimizer starts fresh / LoRA inicializada; optimizador desde cero.")
+            print("=" * 65)
+        else:
+            print(f"[!] init_lora_from set but adapter not found / adapter no encontrado: {prev_adapter}")
 
     last_step_executed = start_step
 
@@ -745,6 +781,9 @@ def train_krea2():
         return
 
     print("\n\nTraining completed! / ¡Entrenamiento finalizado!")
+    # Guardar también el resume_checkpoint al terminar: en el pipeline progresivo
+    # es el hand-off de pesos que carga la fase siguiente vía init_lora_from.
+    save_checkpoint_now(TOTAL_STEPS)
     final = os.path.join(OUTPUT_DIR, "Krea2_FINAL_LoRA.safetensors")
     _export_lora(model, final)
     print(f"✓ Final LoRA saved to / Tu LoRA definitivo está en: {final}")

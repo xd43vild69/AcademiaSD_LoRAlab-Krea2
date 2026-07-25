@@ -1,0 +1,22 @@
+{
+  "trigger_word": "lf_bd_v4.2",
+  "dataset_path": "/home/d13/lab/AcademiaSD_LoRAlab-Krea2/dataset/ds-closeup",
+  "cache_dir": "./cached_data_krea2_lf_bd_v4.2/512",
+  "output_dir": "./krea2_lora_output_lf_bd_v4.2/phase0_512",
+  "total_steps": 4,
+  "lr": 0.0003,
+  "lora_rank": 16,
+  "lora_alpha": 32,
+  "batch_size": 1,
+  "grad_accum_steps": 4,
+  "lora_target": "all",
+  "compact_text": true,
+  "save_every": 250,
+  "seed": 42,
+  "preview_every": 0,
+  "preview_caption_mode": "first",
+  "export_models_dir": "",
+  "export_final_name": "krea2_lora_lf_bd_v4.2.safetensors",
+  "gradient_checkpointing": true,
+  "init_lora_from": ""
+}

@@ -33,6 +33,7 @@ DEFAULTS = {
     "max_seq_len": 128,
     "project_name": "",
     "trigger_word": "",
+    "resolutions": [],
 }
 
 # ── CARGAR CONFIGURACIÓN / LOAD CONFIG ──────────────────────────────────────
@@ -55,6 +56,16 @@ MAX_SEQ_LEN  = cfg.get("max_seq_len",  DEFAULTS["max_seq_len"])
 TRIGGER_WORD = cfg.get("trigger_word", "")
 PROJECT_NAME = cfg.get("project_name", "").strip()
 
+# Resolución progresiva: si 'resolutions' trae una lista de áreas, se pre-cachea
+# el dataset a cada una en un subdirectorio {label}/. Si está vacía, se usa la
+# resolución única de 'target_area' (comportamiento clásico, retrocompatible).
+RESOLUTIONS = cfg.get("resolutions", DEFAULTS["resolutions"]) or []
+
+
+def res_label(area):
+    """Etiqueta corta del subdir a partir del área (ej. 589824 -> '768')."""
+    return str(int(round(math.sqrt(area))))
+
 # Formato automático de carpeta de caché según nombre del proyecto
 if PROJECT_NAME:
     CACHE_DIR = f"./cached_data_krea2_{PROJECT_NAME}"
@@ -74,7 +85,10 @@ print(f"  Project Name / Proyecto     : {PROJECT_NAME if PROJECT_NAME else '(Def
 print(f"  Trigger Word / Palabra      : {TRIGGER_WORD}")
 print(f"  Dataset Path / Ruta Dataset : {DATASET_PATH}")
 print(f"  Cache Dir / Carpeta Caché   : {CACHE_DIR}")
-print(f"  Target Area / Área Objetivo : {TARGET_AREA} px²")
+if RESOLUTIONS:
+    print(f"  Resolutions / Progresiva    : {[res_label(a)+'²' for a in RESOLUTIONS]}")
+else:
+    print(f"  Target Area / Área Objetivo : {TARGET_AREA} px²")
 print(f"  Max Side / Lado Máximo      : {MAX_SIDE}")
 print(f"  Multiple / Múltiplo         : {MULTIPLE}")
 print(f"  Max Seq Len / Long. Sec.    : {MAX_SEQ_LEN}")
@@ -90,10 +104,12 @@ def free_vram(*tensors):
     torch.cuda.empty_cache()
 
 
-def bucket_size(w: int, h: int):
-    """(ancho, alto) múltiplos de MULTIPLE, área ≈ TARGET_AREA, conservando el aspecto."""
+def bucket_size(w: int, h: int, area=None):
+    """(ancho, alto) múltiplos de MULTIPLE, área ≈ `area`, conservando el aspecto."""
+    if area is None:
+        area = TARGET_AREA
     ar = w / h
-    bh = math.sqrt(TARGET_AREA / ar)
+    bh = math.sqrt(area / ar)
     bw = ar * bh
     bw = max(MULTIPLE, round(bw / MULTIPLE) * MULTIPLE)
     bh = max(MULTIPLE, round(bh / MULTIPLE) * MULTIPLE)
@@ -178,10 +194,40 @@ def preprocess_krea2():
     latents_std  = torch.tensor(pipe.vae.config.latents_std,  device="cuda", dtype=torch.float32).view(1, z_dim, 1, 1, 1)
     print(f"VAE z_dim={z_dim} | Channel normalization OK / Normalización por canal OK")
 
+    # Objetivos de resolución: cada uno es una caché autocontenida. En modo
+    # progresivo van a subdirs {label}/; en modo clásico, a CACHE_DIR directamente.
+    if RESOLUTIONS:
+        targets = [(os.path.join(CACHE_DIR, res_label(a)), a) for a in RESOLUTIONS]
+    else:
+        targets = [(CACHE_DIR, TARGET_AREA)]
+    for out_dir, _ in targets:
+        os.makedirs(out_dir, exist_ok=True)
+
+    def vae_latent(img_pil, area):
+        """Redimensiona/recorta al bucket de `area` y devuelve el latente normalizado."""
+        bw, bh = bucket_size(img_pil.width, img_pil.height, area)
+        ratio = max(bw / img_pil.width, bh / img_pil.height)
+        im = img_pil.resize((math.ceil(img_pil.width * ratio), math.ceil(img_pil.height * ratio)), Image.LANCZOS)
+        left = (im.width - bw) // 2
+        top  = (im.height - bh) // 2
+        im   = im.crop((left, top, left + bw, top + bh))
+
+        img_tensor = F_vision.pil_to_tensor(im).unsqueeze(0).unsqueeze(2)  # [1,3,1,H,W]
+        img_tensor = (img_tensor.float() / 127.5) - 1.0
+        img_tensor = img_tensor.to("cuda", dtype=torch.bfloat16)
+
+        z = pipe.vae.encode(img_tensor).latent_dist.sample().float()
+        latent = (z - latents_mean) / latents_std
+        latent = latent[:, :, 0].to(torch.bfloat16).cpu()
+        free_vram(img_tensor, z)
+        return bw, bh, latent
+
     with torch.inference_mode():
+        # El embed negativo es independiente de la resolución: se guarda en cada caché.
         neg_embed, neg_mask = pipe.encode_prompt(prompt="", max_sequence_length=MAX_SEQ_LEN)
-        torch.save(neg_embed.cpu(), os.path.join(CACHE_DIR, "_neg_embed.pt"))
-        torch.save(neg_mask.cpu(),  os.path.join(CACHE_DIR, "_neg_mask.pt"))
+        for out_dir, _ in targets:
+            torch.save(neg_embed.cpu(), os.path.join(out_dir, "_neg_embed.pt"))
+            torch.save(neg_mask.cpu(),  os.path.join(out_dir, "_neg_mask.pt"))
         del neg_embed, neg_mask
 
         for idx, archivo in enumerate(archivos_img, 1):
@@ -189,32 +235,13 @@ def preprocess_krea2():
             ruta_texto  = os.path.join(DATASET_PATH, f"{nombre_base}.txt")
             print(f"[{idx}/{len(archivos_img)}] Processing / Procesando: {archivo}")
 
-            # ── 1. IMAGEN → LATENTES (VAE) ──────────────────────────────────
             try:
                 img = Image.open(os.path.join(DATASET_PATH, archivo)).convert("RGB")
             except Exception as err:
                 print(f"[!] Warning: Cannot open image / No se pudo abrir la imagen '{archivo}': {err}")
                 continue
-            bw, bh = bucket_size(*img.size)
 
-            ratio = max(bw / img.width, bh / img.height)
-            img = img.resize((math.ceil(img.width * ratio), math.ceil(img.height * ratio)), Image.LANCZOS)
-            left = (img.width - bw) // 2
-            top  = (img.height - bh) // 2
-            img  = img.crop((left, top, left + bw, top + bh))
-
-            img_tensor = F_vision.pil_to_tensor(img).unsqueeze(0).unsqueeze(2)  # [1,3,1,H,W]
-            img_tensor = (img_tensor.float() / 127.5) - 1.0
-            img_tensor = img_tensor.to("cuda", dtype=torch.bfloat16)
-
-            z = pipe.vae.encode(img_tensor).latent_dist.sample().float()
-            latent = (z - latents_mean) / latents_std
-            latent = latent[:, :, 0].to(torch.bfloat16)
-
-            torch.save(latent.cpu(), os.path.join(CACHE_DIR, f"{nombre_base}_latent.pt"))
-            free_vram(img_tensor, z, latent)
-
-            # ── 2. TEXTO → EMBEDDINGS (+ MÁSCARA) ───────────────────────────
+            # ── 1. TEXTO → EMBEDDINGS (una sola vez; es independiente de la resolución) ──
             prompt = ""
             if os.path.exists(ruta_texto):
                 with open(ruta_texto, "r", encoding="utf-8") as f:
@@ -224,11 +251,20 @@ def preprocess_krea2():
                 prompt = f"{TRIGGER_WORD}, {prompt}".strip(", ")
 
             embeds, mask = pipe.encode_prompt(prompt=prompt, max_sequence_length=MAX_SEQ_LEN)
+            embeds_cpu, mask_cpu = embeds.cpu(), mask.cpu()
+            del embeds, mask
 
-            torch.save(embeds.cpu(), os.path.join(CACHE_DIR, f"{nombre_base}_embed.pt"))
-            torch.save(mask.cpu(),   os.path.join(CACHE_DIR, f"{nombre_base}_mask.pt"))
+            # ── 2. IMAGEN → LATENTES (VAE), una vez por resolución ──────────
+            sizes = []
+            for out_dir, area in targets:
+                bw, bh, latent = vae_latent(img, area)
+                torch.save(latent, os.path.join(out_dir, f"{nombre_base}_latent.pt"))
+                torch.save(embeds_cpu, os.path.join(out_dir, f"{nombre_base}_embed.pt"))
+                torch.save(mask_cpu,   os.path.join(out_dir, f"{nombre_base}_mask.pt"))
+                sizes.append(f"{bw}x{bh}")
+                free_vram(latent)
 
-            print(f"   [OK] {bw}x{bh} | Latents & Embeddings cached / Latentes y embeddings cacheados.")
+            print(f"   [OK] {' · '.join(sizes)} | Latents & Embeddings cached / Latentes y embeddings cacheados.")
 
     free_vram(pipe)
     print("\n✓ Pre-caching finished! VRAM freed / ¡Pre-caché finalizado! VRAM liberada.")

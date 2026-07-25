@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,116 +24,638 @@
             --warning: #f59e0b;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background-color: var(--bg-dark); color: var(--text-main); display: flex; flex-direction: column; min-height: 100vh; padding: 20px; }
-        
-        header { display: flex; flex-direction: column; background: var(--panel-bg); padding: 18px 25px; border-radius: 12px; border: 1px solid var(--panel-border); margin-bottom: 20px; gap: 15px; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            flex-direction: column;
+            background: var(--panel-bg);
+            padding: 18px 25px;
+            border-radius: 12px;
+            border: 1px solid var(--panel-border);
+            margin-bottom: 20px;
+            gap: 15px;
+        }
 
         /* Banner Superior Panorámico */
-        .banner-container { width: 100%; max-height: 140px; overflow: hidden; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #020617; border: 1px solid var(--panel-border); }
-        .banner-img { width: 100%; height: 100%; max-height: 140px; object-fit: contain; display: block; }
+        .banner-container {
+            width: 100%;
+            max-height: 140px;
+            overflow: hidden;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #020617;
+            border: 1px solid var(--panel-border);
+        }
 
-        .header-content { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; width: 100%; }
-        .logo-title { display: flex; align-items: center; gap: 15px; }
-        .logo-title h1 { font-size: 1.5rem; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
-        .logo-title span { font-size: 0.85rem; color: var(--text-muted); display: block; }
+        .banner-img {
+            width: 100%;
+            height: 100%;
+            max-height: 140px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .logo-title {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-title h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-title span {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: block;
+        }
 
         /* Social Links */
-        .social-links { display: flex; gap: 8px; flex-wrap: wrap; }
-        .social-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; text-decoration: none; color: #fff; background: #0f172a; border: 1px solid var(--panel-border); transition: background 0.2s, border-color 0.2s; }
-        .social-btn:hover { border-color: var(--accent); background: #1a2332; }
-        .btn-yt { color: #ff0000; }
-        .btn-x { color: #f8fafc; }
-        .btn-discord { color: #5865f2; }
-        .btn-kofi { color: #ff5e5b; }
+        .social-links {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .social-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-decoration: none;
+            color: #fff;
+            background: #0f172a;
+            border: 1px solid var(--panel-border);
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .social-btn:hover {
+            border-color: var(--accent);
+            background: #1a2332;
+        }
+
+        .btn-yt {
+            color: #ff0000;
+        }
+
+        .btn-x {
+            color: #f8fafc;
+        }
+
+        .btn-discord {
+            color: #5865f2;
+        }
+
+        .btn-kofi {
+            color: #ff5e5b;
+        }
 
         /* Hardware Monitor Cards (RAM, VRAM, GPU Temp) */
-        .hardware-monitor { display: flex; gap: 12px; }
-        .hw-card { background: #0f172a; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--panel-border); min-width: 140px; }
-        .hw-card .label { font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
-        .hw-card .value { font-size: 0.95rem; font-weight: bold; margin: 3px 0; color: #38bdf8; }
-        .progress-bar-bg { width: 100%; height: 6px; background: #334155; border-radius: 3px; overflow: hidden; }
-        .progress-bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.5s ease, background-color 0.5s ease; }
+        .hardware-monitor {
+            display: flex;
+            gap: 12px;
+        }
 
-        .main-grid { display: grid; grid-template-columns: 440px 1fr; gap: 20px; flex: 1; }
-        .sidebar { display: flex; flex-direction: column; gap: 20px; }
-        .panel { background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--panel-border); padding: 20px; }
-        .panel-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 15px; color: #f1f5f9; border-bottom: 1px solid var(--panel-border); padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .hw-card {
+            background: #0f172a;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+            min-width: 140px;
+        }
 
-        .form-group { margin-bottom: 12px; }
-        .form-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }
-        .form-group input, .form-group select { width: 100%; background: #0f172a; border: 1px solid var(--panel-border); color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 0.9rem; outline: none; }
-        .form-group input[readonly] { background: #1a2332; color: #94a3b8; cursor: not-allowed; border-style: dashed; }
-        .form-group input:focus, .form-group select:focus { border-color: var(--accent); }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .hw-card .label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
 
-        .btn { padding: 9px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; border: none; font-size: 0.88rem; transition: background 0.2s, transform 0.1s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
-        .btn-full { width: 100%; }
-        .btn-primary { background: var(--accent); color: white; }
-        .btn-primary:hover { background: var(--accent-hover); }
-        .btn-success { background: var(--success); color: white; }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-secondary { background: #334155; color: white; }
-        .btn-secondary:hover { background: #475569; }
-        .btn-warning { background: var(--warning); color: black; }
-        .btn-sm { padding: 4px 10px; font-size: 0.75rem; width: auto; }
-        
-        .btn-row { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; width: 100% !important; box-sizing: border-box !important; }
+        .hw-card .value {
+            font-size: 0.95rem;
+            font-weight: bold;
+            margin: 3px 0;
+            color: #38bdf8;
+        }
 
-        .btn-tall { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; padding: 8px 6px !important; line-height: 1.25 !important; text-align: center !important; min-height: 50px !important; width: 100% !important; box-sizing: border-box !important; }
-        .btn-tall .main-text { font-size: 0.85rem; font-weight: 700; color: inherit; }
-        .btn-tall .sub-text { font-size: 0.72rem; font-weight: 500; opacity: 0.85; margin-top: 2px; }
+        .progress-bar-bg {
+            width: 100%;
+            height: 6px;
+            background: #334155;
+            border-radius: 3px;
+            overflow: hidden;
+        }
 
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.5s ease, background-color 0.5s ease;
+        }
 
-        .console-container { display: flex; flex-direction: column; gap: 20px; }
-        .terminal { background: #020617; border-radius: 8px; border: 1px solid var(--panel-border); padding: 15px; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.85rem; color: #38bdf8; overflow-y: auto; white-space: pre-wrap; word-break: break-all; height: 320px; }
-        .terminal-line { margin-bottom: 2px; line-height: 1.4; }
+        .main-grid {
+            display: grid;
+            grid-template-columns: 440px 1fr;
+            gap: 20px;
+            flex: 1;
+        }
 
-        .ds-toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
-        .ds-search { flex: 1; min-width: 150px; background: #0f172a; border: 1px solid var(--panel-border); color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; }
-        .ds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; max-height: 380px; overflow-y: auto; padding-right: 5px; }
-        .ds-grid.compact { grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); }
-        .ds-grid.large { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
-        .ds-grid.hidden { display: none; }
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
 
-        .ds-card { background: #0f172a; border: 1px solid var(--panel-border); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
-        .ds-card:hover { transform: translateY(-2px); border-color: var(--accent); }
-        
-        .img-wrapper { position: relative; width: 100%; height: 115px; background: #020617; }
-        .ds-grid.compact .img-wrapper { height: 75px; }
-        .ds-grid.large .img-wrapper { height: 165px; }
-        .img-wrapper img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .panel {
+            background: var(--panel-bg);
+            border-radius: 12px;
+            border: 1px solid var(--panel-border);
+            padding: 20px;
+        }
 
-        .caption-dot { position: absolute; top: 6px; right: 6px; width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid #0f172a; box-shadow: 0 0 5px rgba(0,0,0,0.8); z-index: 2; }
-        .dot-green { background-color: var(--success); }
-        .dot-red { background-color: var(--danger); }
+        .panel-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #f1f5f9;
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-        .img-filename-tag { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(2px); padding: 3px 6px; font-size: 0.68rem; color: #f8fafc; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid rgba(255,255,255,0.05); }
-        .ds-card .caption { padding: 6px; font-size: 0.72rem; color: var(--text-muted); height: 40px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.2; background: #0f172a; }
+        .form-group {
+            margin-bottom: 12px;
+        }
 
-        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; max-height: 200px; overflow-y: auto; }
-        .preview-card { position: relative; border-radius: 6px; overflow: hidden; border: 1px solid var(--panel-border); cursor: pointer; background: #0f172a; transition: transform 0.15s, border-color 0.15s; }
-        .preview-card:hover { transform: translateY(-2px); border-color: #38bdf8; }
-        .preview-card img { width: 100%; height: 110px; object-fit: cover; display: block; }
-        .preview-filename-tag { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(2px); padding: 3px 6px; font-size: 0.68rem; color: #38bdf8; font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
 
-        .status-badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; font-weight: bold; text-transform: uppercase; }
-        .badge-idle { background: #334155; color: #cbd5e1; }
-        .badge-running { background: var(--success); color: #fff; }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            background: #0f172a;
+            border: 1px solid var(--panel-border);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            outline: none;
+        }
 
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
-        .modal.active { display: flex; }
-        .modal-content { background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--panel-border); max-width: 800px; width: 100%; padding: 20px; display: flex; flex-direction: column; gap: 15px; max-height: 90vh; }
-        .modal-content img { max-height: 55vh; object-fit: contain; border-radius: 8px; }
-        .modal-content textarea { width: 100%; height: 90px; background: #0f172a; border: 1px solid var(--panel-border); color: #fff; padding: 10px; border-radius: 6px; resize: none; font-size: 0.9rem; }
+        .form-group input[readonly] {
+            background: #1a2332;
+            color: #94a3b8;
+            cursor: not-allowed;
+            border-style: dashed;
+        }
 
-        .drive-selector { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-        .dir-list { max-height: 250px; overflow-y: auto; background: #0f172a; border: 1px solid var(--panel-border); border-radius: 6px; padding: 8px; margin-top: 6px; }
-        .dir-item { padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
-        .dir-item:hover { background: #1e293b; color: var(--accent); }
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: var(--accent);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 9px 14px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            font-size: 0.88rem;
+            transition: background 0.2s, transform 0.1s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-decoration: none;
+        }
+
+        .btn-full {
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #334155;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: black;
+        }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            width: auto;
+        }
+
+        .btn-row {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 10px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
+        .btn-tall {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 8px 6px !important;
+            line-height: 1.25 !important;
+            text-align: center !important;
+            min-height: 50px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
+        .btn-tall .main-text {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: inherit;
+        }
+
+        .btn-tall .sub-text {
+            font-size: 0.72rem;
+            font-weight: 500;
+            opacity: 0.85;
+            margin-top: 2px;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .console-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .terminal {
+            background: #020617;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+            padding: 15px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #38bdf8;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            height: 320px;
+        }
+
+        .terminal-line {
+            margin-bottom: 2px;
+            line-height: 1.4;
+        }
+
+        .ds-toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .ds-search {
+            flex: 1;
+            min-width: 150px;
+            background: #0f172a;
+            border: 1px solid var(--panel-border);
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+
+        .ds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+            max-height: 380px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .ds-grid.compact {
+            grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+        }
+
+        .ds-grid.large {
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        }
+
+        .ds-grid.hidden {
+            display: none;
+        }
+
+        .ds-card {
+            background: #0f172a;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            transition: transform 0.15s, border-color 0.15s;
+        }
+
+        .ds-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent);
+        }
+
+        .img-wrapper {
+            position: relative;
+            width: 100%;
+            height: 115px;
+            background: #020617;
+        }
+
+        .ds-grid.compact .img-wrapper {
+            height: 75px;
+        }
+
+        .ds-grid.large .img-wrapper {
+            height: 165px;
+        }
+
+        .img-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .caption-dot {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            border: 1.5px solid #0f172a;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+            z-index: 2;
+        }
+
+        .dot-green {
+            background-color: var(--success);
+        }
+
+        .dot-red {
+            background-color: var(--danger);
+        }
+
+        .img-filename-tag {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(2px);
+            padding: 3px 6px;
+            font-size: 0.68rem;
+            color: #f8fafc;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .ds-card .caption {
+            padding: 6px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            height: 40px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.2;
+            background: #0f172a;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .preview-card {
+            position: relative;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid var(--panel-border);
+            cursor: pointer;
+            background: #0f172a;
+            transition: transform 0.15s, border-color 0.15s;
+        }
+
+        .preview-card:hover {
+            transform: translateY(-2px);
+            border-color: #38bdf8;
+        }
+
+        .preview-card img {
+            width: 100%;
+            height: 110px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .preview-filename-tag {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(2px);
+            padding: 3px 6px;
+            font-size: 0.68rem;
+            color: #38bdf8;
+            font-weight: 600;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .badge-idle {
+            background: #334155;
+            color: #cbd5e1;
+        }
+
+        .badge-running {
+            background: var(--success);
+            color: #fff;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--panel-bg);
+            border-radius: 12px;
+            border: 1px solid var(--panel-border);
+            max-width: 800px;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 90vh;
+        }
+
+        .modal-content img {
+            max-height: 55vh;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .modal-content textarea {
+            width: 100%;
+            height: 90px;
+            background: #0f172a;
+            border: 1px solid var(--panel-border);
+            color: #fff;
+            padding: 10px;
+            border-radius: 6px;
+            resize: none;
+            font-size: 0.9rem;
+        }
+
+        .drive-selector {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .dir-list {
+            max-height: 250px;
+            overflow-y: auto;
+            background: #0f172a;
+            border: 1px solid var(--panel-border);
+            border-radius: 6px;
+            padding: 8px;
+            margin-top: 6px;
+        }
+
+        .dir-item {
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dir-item:hover {
+            background: #1e293b;
+            color: var(--accent);
+        }
     </style>
 </head>
+
 <body>
 
     <!-- Selector Oculto para Cargar Ficheros JSON -->
@@ -141,23 +664,20 @@
     <header>
         <!-- Banner de la cabecera -->
         <div class="banner-container">
-            <img src="/assets/banner.png" alt="AcademiaSD Krea2 LoRAlab" class="banner-img" onerror="this.src='/assets/logo.jpg'; this.onerror=null;">
+
         </div>
 
         <div class="header-content">
             <div class="logo-title">
                 <div>
-                    <h1>AcademiaSD Krea2 LoRAlab</h1>
+                    <h1>AcademiaSD</h1>
                     <span>Web GUI & Automation / Interfaz Web y Automatización</span>
                 </div>
             </div>
 
             <!-- Redes Sociales / Social Links -->
             <div class="social-links">
-                <a href="https://www.youtube.com/@Academia_SD" target="_blank" class="social-btn"><span class="btn-yt">▶</span> YouTube</a>
-                <a href="https://twitter.com/Academia_S_D" target="_blank" class="social-btn"><span class="btn-x">𝕏</span> X (Twitter)</a>
-                <a href="https://discord.gg/Syuaduy678" target="_blank" class="social-btn"><span class="btn-discord">💬</span> Discord</a>
-                <a href="https://ko-fi.com/academiasd" target="_blank" class="social-btn"><span class="btn-kofi">☕</span> Ko-Fi</a>
+
             </div>
 
             <!-- Hardware Monitor (RAM, VRAM, GPU Temp) -->
@@ -165,17 +685,23 @@
                 <div class="hw-card">
                     <div class="label">RAM Usage / Uso RAM</div>
                     <div class="value" id="ram-text">-- GB</div>
-                    <div class="progress-bar-bg"><div class="progress-bar-fill" id="ram-bar"></div></div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="ram-bar"></div>
+                    </div>
                 </div>
                 <div class="hw-card">
                     <div class="label">VRAM Usage / Uso VRAM</div>
                     <div class="value" id="vram-text">-- GB</div>
-                    <div class="progress-bar-bg"><div class="progress-bar-fill" id="vram-bar" style="background:#38bdf8;"></div></div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="vram-bar" style="background:#38bdf8;"></div>
+                    </div>
                 </div>
                 <div class="hw-card">
                     <div class="label">GPU Temp / Temp. GPU</div>
                     <div class="value" id="gpu-temp-text">-- °C</div>
-                    <div class="progress-bar-bg"><div class="progress-bar-fill" id="gpu-temp-bar" style="background:var(--success);"></div></div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="gpu-temp-bar" style="background:var(--success);"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -184,15 +710,16 @@
     <div class="main-grid">
         <!-- Sidebar: Settings -->
         <div class="sidebar">
-            
+
             <!-- 1. Pre-Cache Settings Panel -->
             <div class="panel">
                 <div class="panel-title">1. Pre-Cache Settings / Config. Pre-Caché</div>
-                
+
                 <div class="form-row">
                     <div class="form-group">
                         <label>Project Name / Proyecto:</label>
-                        <input type="text" id="project_name" value="" placeholder="Ej: cherry2" oninput="updateProjectPaths()">
+                        <input type="text" id="project_name" value="" placeholder="Ej: cherry2"
+                            oninput="updateProjectPaths()">
                     </div>
                     <div class="form-group">
                         <label>Trigger Word / Palabra Clave:</label>
@@ -204,16 +731,27 @@
                     <label>Dataset Path / Ruta del Dataset:</label>
                     <div style="display:flex; gap:8px;">
                         <input type="text" id="dataset_path" value="./dataset" onchange="loadDatasetInfo()">
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="browseFolderNative('dataset')">Browse / Explorar</button>
+                        <button type="button" class="btn btn-secondary btn-sm"
+                            onclick="browseFolderNative('dataset')">Browse / Explorar</button>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label>Cache Folder / Carpeta Caché (Auto):</label>
-                    <input type="text" id="precache_cache_dir" value="./cached_data_krea2" readonly title="Ruta informativa generada automáticamente">
+                    <input type="text" id="precache_cache_dir" value="./cached_data_krea2" readonly
+                        title="Ruta informativa generada automáticamente">
                 </div>
 
                 <div class="form-group">
+                    <label>Progressive Resolution / Resolución Progresiva:</label>
+                    <select id="progressive_mode" onchange="syncProgressive(this.value)">
+                        <option value="off" selected>Off / Única resolución</option>
+                        <option value="768_1024">768² → 1024² (2 fases)</option>
+                        <option value="512_768_1024">512² → 768² → 1024² (3 fases)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="single_res_group">
                     <label>Resolution / Resolución (px²):</label>
                     <select id="target_area_select" onchange="syncResolution(this.value)">
                         <option value="262144">512 x 512 (262,144 px²)</option>
@@ -257,7 +795,8 @@
                     </button>
                 </div>
 
-                <button type="button" class="btn btn-primary btn-tall btn-full" id="btn-precache" onclick="runPrecache()" style="margin-top:8px;">
+                <button type="button" class="btn btn-primary btn-tall btn-full" id="btn-precache"
+                    onclick="runPrecache()" style="margin-top:8px;">
                     <span class="main-text">Start Pre-Cache</span>
                     <span class="sub-text">Iniciar Pre-Caché</span>
                 </button>
@@ -269,10 +808,11 @@
                     <span>2. Training Settings / Config. Entrenamiento</span>
                     <span id="checkpoint-badge" style="font-size:0.75rem; color:#38bdf8;"></span>
                 </div>
-                
+
                 <div class="form-group">
                     <label>Output Dir / Carpeta Salida (Auto):</label>
-                    <input type="text" id="train_output_dir" value="./krea2_lora_output" readonly title="Ruta informativa generada automáticamente">
+                    <input type="text" id="train_output_dir" value="./krea2_lora_output" readonly
+                        title="Ruta informativa generada automáticamente">
                 </div>
 
                 <div class="form-row">
@@ -380,21 +920,24 @@
             <!-- 3. Export to WebUI Models Panel -->
             <div class="panel">
                 <div class="panel-title">3. Export to WebUI / Enviar a Models</div>
-                
+
                 <div class="form-group">
                     <label>Final LoRA Filename / Nombre Final (.safetensors):</label>
-                    <input type="text" id="export_final_name" value="krea2_lora.safetensors" placeholder="mi_lora_krea2.safetensors">
+                    <input type="text" id="export_final_name" value="krea2_lora.safetensors"
+                        placeholder="mi_lora_krea2.safetensors">
                 </div>
 
                 <div class="form-group">
                     <label>UI LoRA Folder / Carpeta models/lora (ComfyUI / Forge / A1111):</label>
                     <div style="display:flex; gap:8px;">
                         <input type="text" id="export_models_dir" value="" placeholder="C:/ComfyUI/models/loras">
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="browseFolderNative('export')">Browse / Explorar</button>
+                        <button type="button" class="btn btn-secondary btn-sm"
+                            onclick="browseFolderNative('export')">Browse / Explorar</button>
                     </div>
                 </div>
 
-                <button type="button" class="btn btn-warning btn-tall btn-full" onclick="sendToModels()" style="margin-top:5px;">
+                <button type="button" class="btn btn-warning btn-tall btn-full" onclick="sendToModels()"
+                    style="margin-top:5px;">
                     <span class="main-text">🚀 Send to Models</span>
                     <span class="sub-text">Enviar a Models</span>
                 </button>
@@ -407,21 +950,29 @@
                 <span>Console Output / Terminal de Consola</span>
                 <span class="status-badge badge-idle" id="status-badge">IDLE / INACTIVO</span>
             </div>
-            
+
             <div class="terminal" id="terminal"></div>
 
             <!-- Dataset Inspector -->
             <div>
                 <div class="panel-title">
-                    <span>Dataset Inspector / Inspector (<span id="ds-count">0</span> img, <span id="ds-txt-count">0</span> txt)</span>
+                    <span>Dataset Inspector / Inspector (<span id="ds-count">0</span> img, <span
+                            id="ds-txt-count">0</span> txt)</span>
                     <div class="ds-toolbar">
-                        <input type="text" class="ds-search" id="ds-search" placeholder="Search / Buscar..." oninput="filterDatasetGrid()">
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="setGridMode('compact')">Compact / Pequeño</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="setGridMode('normal')">Normal</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="setGridMode('large')">Expand / Grande</button>
-                        <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-ds" onclick="toggleDatasetGrid()">Hide / Ocultar</button>
-                        <button type="button" class="btn btn-warning btn-sm" onclick="addTriggerToAllCaptions()">+ Trigger All</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadDatasetInfo()">Refresh / Actualizar</button>
+                        <input type="text" class="ds-search" id="ds-search" placeholder="Search / Buscar..."
+                            oninput="filterDatasetGrid()">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="setGridMode('compact')">Compact
+                            / Pequeño</button>
+                        <button type="button" class="btn btn-secondary btn-sm"
+                            onclick="setGridMode('normal')">Normal</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="setGridMode('large')">Expand /
+                            Grande</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-ds"
+                            onclick="toggleDatasetGrid()">Hide / Ocultar</button>
+                        <button type="button" class="btn btn-warning btn-sm" onclick="addTriggerToAllCaptions()">+
+                            Trigger All</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadDatasetInfo()">Refresh /
+                            Actualizar</button>
                     </div>
                 </div>
                 <div class="ds-grid" id="ds-grid"></div>
@@ -448,7 +999,8 @@
                 <textarea id="modal-txt"></textarea>
             </div>
             <div style="display:flex; gap:10px;">
-                <button type="button" class="btn btn-success btn-full" onclick="saveCurrentCaption()">Save Caption / Guardar Caption</button>
+                <button type="button" class="btn btn-success btn-full" onclick="saveCurrentCaption()">Save Caption /
+                    Guardar Caption</button>
                 <button type="button" class="btn btn-secondary btn-full" onclick="closeModal()">Close / Cerrar</button>
             </div>
         </div>
@@ -459,13 +1011,15 @@
         <div class="modal-content" onclick="event.stopPropagation()" style="max-width:600px;">
             <h3>Select Directory / Seleccionar Carpeta</h3>
             <div style="font-size:0.85rem; color:var(--text-muted);" id="browser-current-path">/</div>
-            
+
             <div class="drive-selector" id="drive-selector"></div>
             <div class="dir-list" id="dir-list"></div>
 
             <div style="display:flex; gap:10px; margin-top:10px;">
-                <button type="button" class="btn btn-primary btn-full" onclick="confirmFolderSelection()">Use Selected Folder / Usar Carpeta</button>
-                <button type="button" class="btn btn-secondary btn-full" onclick="closeFolderModal()">Cancel / Cancelar</button>
+                <button type="button" class="btn btn-primary btn-full" onclick="confirmFolderSelection()">Use Selected
+                    Folder / Usar Carpeta</button>
+                <button type="button" class="btn btn-secondary btn-full" onclick="closeFolderModal()">Cancel /
+                    Cancelar</button>
             </div>
         </div>
     </div>
@@ -489,7 +1043,7 @@
                 // Monitor Temperatura GPU (°C)
                 const temp = data.vram.temp_c || 0;
                 document.getElementById('gpu-temp-text').innerText = temp ? `${temp} °C` : 'N/A';
-                
+
                 const tempBar = document.getElementById('gpu-temp-bar');
                 const tempPct = Math.min(100, Math.max(0, (temp / 100) * 100));
                 tempBar.style.width = `${tempPct}%`;
@@ -501,7 +1055,7 @@
                 } else {
                     tempBar.style.backgroundColor = 'var(--success)';
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
         setInterval(updateSystemStats, 3000);
         updateSystemStats();
@@ -510,10 +1064,10 @@
             const proj = document.getElementById('project_name').value.trim();
             const cacheDir = proj ? `./cached_data_krea2_${proj}` : './cached_data_krea2';
             const outputDir = proj ? `./krea2_lora_output_${proj}` : './krea2_lora_output';
-            
+
             document.getElementById('precache_cache_dir').value = cacheDir;
             document.getElementById('train_output_dir').value = outputDir;
-            
+
             if (proj) {
                 document.getElementById('export_final_name').value = `krea2_lora_${proj}.safetensors`;
             }
@@ -522,10 +1076,24 @@
 
         // VRAM estimada con batch_size 1, LoRA rank 16 y compact_text activo.
         const VRAM_HINTS = {
-            '262144':  '~8.6 GB de VRAM · rápido',
-            '589824':  '~9.2 GB de VRAM · ~2.2x más lento que 512² · recomendado para 12 GB',
+            '262144': '~8.6 GB de VRAM · rápido',
+            '589824': '~9.2 GB de VRAM · ~2.2x más lento que 512² · recomendado para 12 GB',
             '1048576': '~10.3 GB de VRAM · ajustado en 12 GB, requiere GPU libre'
         };
+
+        // Preset progresivo -> lista de áreas para el pre-cache.
+        const PROGRESSIVE_RESOLUTIONS = {
+            'off': [],
+            '768_1024': [589824, 1048576],
+            '512_768_1024': [262144, 589824, 1048576]
+        };
+
+        function syncProgressive(val) {
+            // En modo progresivo, el pico de VRAM lo marca la última fase; se oculta
+            // el selector de resolución única porque las resoluciones las fija el preset.
+            const single = document.getElementById('single_res_group');
+            if (single) single.style.display = (val && val !== 'off') ? 'none' : 'block';
+        }
 
         function syncResolution(val) {
             const customInput = document.getElementById('precache_target_area');
@@ -582,12 +1150,20 @@
                     if (t.preview_caption_mode) document.getElementById('train_preview_caption_mode').value = t.preview_caption_mode;
                     if (t.export_models_dir) document.getElementById('export_models_dir').value = t.export_models_dir;
                     if (t.export_final_name) document.getElementById('export_final_name').value = t.export_final_name;
+                    if (t.progressive) document.getElementById('progressive_mode').value = t.progressive;
                 }
+                // Si no vino de train, derivar el preset del pre-cache (resolutions).
+                if ((!data.train || !data.train.progressive) && data.pre_cache && Array.isArray(data.pre_cache.resolutions) && data.pre_cache.resolutions.length > 1) {
+                    const n = data.pre_cache.resolutions.length;
+                    document.getElementById('progressive_mode').value = (n === 3) ? '512_768_1024' : '768_1024';
+                }
+                syncProgressive(document.getElementById('progressive_mode').value);
                 updateProjectPaths();
                 loadDatasetInfo();
-            } catch (e) {}
+            } catch (e) { }
         }
         syncResolution(document.getElementById('target_area_select').value);
+        syncProgressive(document.getElementById('progressive_mode').value);
         loadSettings();
 
         // CARGAR FICHERO JSON
@@ -601,14 +1177,14 @@
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = async function(e) {
+            reader.onload = async function (e) {
                 try {
                     const data = JSON.parse(e.target.result);
-                    
+
                     if (data.project_name !== undefined) document.getElementById('project_name').value = data.project_name;
                     if (data.trigger_word !== undefined) document.getElementById('trigger_word').value = data.trigger_word;
                     if (data.dataset_path !== undefined) document.getElementById('dataset_path').value = data.dataset_path;
-                    
+
                     if (data.target_area !== undefined) {
                         document.getElementById('precache_target_area').value = data.target_area;
                         const sel = document.getElementById('target_area_select');
@@ -624,7 +1200,7 @@
                     if (data.multiple !== undefined) document.getElementById('precache_multiple').value = data.multiple;
                     if (data.max_side !== undefined) document.getElementById('precache_max_side').value = data.max_side;
                     if (data.max_seq_len !== undefined) document.getElementById('precache_max_seq_len').value = data.max_seq_len;
-                    
+
                     if (data.total_steps !== undefined) document.getElementById('train_total_steps').value = data.total_steps;
                     if (data.lr !== undefined) document.getElementById('train_lr').value = data.lr;
                     if (data.lora_rank !== undefined) document.getElementById('train_lora_rank').value = data.lora_rank;
@@ -641,7 +1217,7 @@
                     if (data.export_final_name !== undefined) document.getElementById('export_final_name').value = data.export_final_name;
 
                     updateProjectPaths();
-                    
+
                     if (currentLoadTarget === 'precache') {
                         await savePrecacheSettings();
                     } else if (currentLoadTarget === 'train') {
@@ -671,7 +1247,7 @@
                     body: JSON.stringify({ initial_dir: currentPath })
                 });
                 const data = await res.json();
-                
+
                 if (data.status === 'ok' && data.path) {
                     if (target === 'dataset') {
                         document.getElementById('dataset_path').value = data.path;
@@ -689,6 +1265,7 @@
 
         async function savePrecacheSettings() {
             const proj = document.getElementById('project_name').value.trim();
+            const prog = document.getElementById('progressive_mode').value;
             const precacheData = {
                 project_name: proj,
                 trigger_word: document.getElementById('trigger_word').value,
@@ -697,7 +1274,10 @@
                 multiple: parseInt(document.getElementById('precache_multiple').value),
                 max_side: parseInt(document.getElementById('precache_max_side').value),
                 max_seq_len: parseInt(document.getElementById('precache_max_seq_len').value),
-                cache_dir: document.getElementById('precache_cache_dir').value
+                cache_dir: document.getElementById('precache_cache_dir').value,
+                // En modo progresivo se pre-cachea a varias resoluciones (subdirs);
+                // vacío = resolución única clásica.
+                resolutions: PROGRESSIVE_RESOLUTIONS[prog] || []
             };
             const res = await fetch('/api/save-precache', { method: 'POST', body: JSON.stringify(precacheData) });
             const data = await res.json();
@@ -728,7 +1308,8 @@
                 preview_every: parseInt(document.getElementById('train_preview_every').value),
                 preview_caption_mode: document.getElementById('train_preview_caption_mode').value,
                 export_models_dir: document.getElementById('export_models_dir').value,
-                export_final_name: document.getElementById('export_final_name').value
+                export_final_name: document.getElementById('export_final_name').value,
+                progressive: document.getElementById('progressive_mode').value
             };
             const res = await fetch('/api/save-train', { method: 'POST', body: JSON.stringify(trainData) });
             const data = await res.json();
@@ -748,7 +1329,7 @@
                 } else {
                     badge.innerText = '[New / Nuevo]';
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
 
         function appendTerminal(text, replace = false) {
@@ -797,7 +1378,7 @@
                                 } else if (msg.type === 'done') {
                                     appendTerminal(`\n[SYSTEM] Finished with code / Finalizado con código: ${msg.code}`);
                                 }
-                            } catch (e) {}
+                            } catch (e) { }
                         }
                     }
                 }
@@ -859,7 +1440,7 @@
             document.getElementById('btn-precache').disabled = running;
             document.getElementById('btn-train').disabled = running;
             document.getElementById('btn-stop').disabled = !running;
-            
+
             const badge = document.getElementById('status-badge');
             if (running) {
                 badge.className = 'status-badge badge-running';
@@ -878,7 +1459,7 @@
                 document.getElementById('ds-count').innerText = data.image_count;
                 document.getElementById('ds-txt-count').innerText = data.caption_count;
                 renderDatasetGrid(allDatasetImages);
-            } catch (e) {}
+            } catch (e) { }
         }
 
         function renderDatasetGrid(images) {
@@ -888,7 +1469,7 @@
                 const card = document.createElement('div');
                 card.className = 'ds-card';
                 card.onclick = () => openModal(`/api/dataset-image/${img.file}`, img.file, img.caption || '');
-                
+
                 const hasCaption = img.has_txt && img.caption && img.caption.trim().length > 0;
                 const dotClass = hasCaption ? 'caption-dot dot-green' : 'caption-dot dot-red';
                 const dotTitle = hasCaption ? 'Caption OK / Texto existente' : 'No Caption / Sin texto';
@@ -907,7 +1488,7 @@
 
         function filterDatasetGrid() {
             const q = document.getElementById('ds-search').value.toLowerCase();
-            const filtered = allDatasetImages.filter(img => 
+            const filtered = allDatasetImages.filter(img =>
                 img.file.toLowerCase().includes(q) || (img.caption && img.caption.toLowerCase().includes(q))
             );
             renderDatasetGrid(filtered);
@@ -971,7 +1552,7 @@
                     `;
                     gallery.appendChild(card);
                 });
-            } catch (e) {}
+            } catch (e) { }
         }
         setInterval(loadPreviews, 8000);
         loadPreviews();
@@ -1010,10 +1591,10 @@
             }
             const res = await fetch(`/api/browse-dir?path=${encodeURIComponent(path)}`);
             const data = await res.json();
-            
+
             browserPath = data.current_path;
             document.getElementById('browser-current-path').innerText = `${browserPath} (${data.image_count} images inside)`;
-            
+
             const driveSel = document.getElementById('drive-selector');
             driveSel.innerHTML = '';
             if (data.drives && data.drives.length > 0) {
@@ -1062,4 +1643,5 @@
         }
     </script>
 </body>
+
 </html>
