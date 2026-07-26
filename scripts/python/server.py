@@ -250,6 +250,7 @@ def load_curation(dataset_dir):
         "baselines_by_mode": baselines_by_mode,
         "auto_threshold": auto_threshold,
         "threshold": threshold,
+        "weight_priority": float(weights.get("priority", 1.5)),
         "weight_good": float(weights.get("good", 1.0)),
         "weight_bad": float(weights.get("bad", 0.5)),
     }

@@ -930,10 +930,14 @@ def load_curation_weights(dataset_path, cache_names):
     group_ovr = overrides.get("groups") or {}
     weights_cfg = report.get("weights") or {}
     mode = report.get("mode") or "face"
+    w_priority = float(weights_cfg.get("priority", 1.5))
     w_good = float(weights_cfg.get("good", 1.0))
     w_bad = float(weights_cfg.get("bad", 0.5))
 
-    weights, counts, unscored = {}, {"good": 0, "bad": 0}, []
+    baselines_raw = report.get("baselines") or []
+    baselines_stems = set(b.split('.')[0] for b in baselines_raw)
+
+    weights, counts, unscored = {}, {"priority": 0, "good": 0, "bad": 0}, []
     for name in cache_names:
         # Con flip_x el caché guarda `img_001` E `img_001__flip` como entradas
         # separadas, pero la curaduría puntuó la imagen fuente: sin quitar el
@@ -947,9 +951,14 @@ def load_curation_weights(dataset_path, cache_names):
             unscored.append(stem)
             weights[name] = 1.0
             continue
-        group = _curation_group(entry.get("score"), threshold, group_ovr.get(stem), mode=mode)
-        counts[group] += 1
-        weights[name] = w_good if group == "good" else w_bad
+
+        if stem in baselines_stems or (entry and entry.get("file") in baselines_raw):
+            counts["priority"] += 1
+            weights[name] = w_priority
+        else:
+            group = _curation_group(entry.get("score"), threshold, group_ovr.get(stem), mode=mode)
+            counts[group] += 1
+            weights[name] = w_good if group == "good" else w_bad
 
     if unscored:
         uniq = sorted(set(unscored))
@@ -961,8 +970,8 @@ def load_curation_weights(dataset_path, cache_names):
     if all(abs(w - 1.0) < 1e-9 for w in weights.values()):
         return None, None
 
-    summary = {"good": counts["good"], "bad": counts["bad"],
-               "w_good": w_good, "w_bad": w_bad, "threshold": threshold}
+    summary = {"priority": counts["priority"], "good": counts["good"], "bad": counts["bad"],
+               "w_priority": w_priority, "w_good": w_good, "w_bad": w_bad, "threshold": threshold}
     return weights, summary
 
 
@@ -1624,9 +1633,12 @@ def train_krea2():
         thr = curation_summary["threshold"]
         print(f"\n[OK] Curaduría activa / curation active — umbral "
               f"{'auto' if thr is None else f'{thr * 100:.0f}%'}:")
-        print(f"     Buena calificación : {curation_summary['good']:>4} imagen(es) · "
+        if curation_summary.get("priority"):
+            print(f"     ⭐ Alta Prioridad (Baselines) : {curation_summary['priority']:>4} imagen(es) · "
+                  f"peso ×{curation_summary.get('w_priority', 1.5)}")
+        print(f"     Buena calificación           : {curation_summary['good']:>4} imagen(es) · "
               f"peso ×{curation_summary['w_good']}")
-        print(f"     Baja calificación  : {curation_summary['bad']:>4} imagen(es) · "
+        print(f"     Baja calificación            : {curation_summary['bad']:>4} imagen(es) · "
               f"peso ×{curation_summary['w_bad']}")
 
     neg = None

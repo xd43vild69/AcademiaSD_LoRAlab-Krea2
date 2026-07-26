@@ -631,9 +631,16 @@
             padding: 1px var(--s2);
             border-radius: var(--r9);
             background: rgba(11, 16, 32, .88);
-            border: 1px solid currentColor;
-            font-size: var(--fs-xs);
+            border: 1px solid var(--accent);
             color: var(--accent);
+            font-size: var(--fs-xs);
+            font-weight: 600;
+        }
+
+        .priority-badge {
+            border-color: #ffc107 !important;
+            color: #ffc107 !important;
+            background: rgba(245, 158, 11, 0.25) !important;
         }
 
         .ds-group-head {
@@ -2172,9 +2179,10 @@
                     scoreBadge = `<span class="score-badge ${group}">${Math.round(img.score * 100)}%</span>`;
                 }
             }
-            const isOverride = !!curationGroupOverrides[stemOf(img.file)];
-            const ovrBadge = isOverride ? `<span class="ovr-badge" title="Manually reassigned">manual</span>` : '';
             const isBase = curationBaselines.includes(stemOf(img.file)) || curationBaselines.includes(img.file);
+            const isOverride = !!curationGroupOverrides[stemOf(img.file)];
+            const ovrBadge = isBase ? `<span class="ovr-badge priority-badge" title="High Priority Baseline (1.5x Weight)">★ 1.5×</span>`
+                             : (isOverride ? `<span class="ovr-badge" title="Manually reassigned">manual</span>` : '');
             const safeFile = escapeHtml(img.file);
 
             card.innerHTML = `
