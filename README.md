@@ -10,14 +10,24 @@
 
 **AcademiaSD LoRAlab-Krea2** is an advanced, high-performance training suite and web interface designed for training high-quality LoRA models on **Krea-2 (Rectified Flow / Diffusion Transformer)** architectures.
 
-It features an interactive web GUI with real-time VRAM/RAM monitoring, progressive multi-phase resolution training, advanced training dynamics, dataset caption inspection, batch search-and-replace tag editing, and automated headless CLI execution.
+It features an interactive web GUI with real-time VRAM/RAM monitoring, face-identity dataset curation, progressive multi-phase resolution training, background session persistence via tmux, advanced training dynamics, dataset caption inspection, batch search-and-replace tag editing, and automated headless CLI execution.
 
 ---
 
 ## ✨ Key Features
 
 - **🌐 Interactive Web Interface**: Sleek dark-mode web GUI built for configuring parameters, inspecting datasets, tracking console logs, and previewing generated step outputs.
-- **📈 Progressive Multi-Resolution Training**: Train sequentially across resolution phases (e.g., $512^2 \rightarrow 768^2 \rightarrow 1024^2$) with cross-phase weight persistence, global progress tracking, and per-phase learning rate re-warmups.
+- **👤 Face Identity Dataset Curation (`0_curate_dataset.py`)**:
+  - Pre-training CPU-only face embedding comparison using ArcFace / InsightFace against up to 3 baseline target photos.
+  - Non-destructive dataset weighting: partitions images into high-similarity (`weight_good`) and lower-similarity (`weight_bad`) groups to adjust loss contribution without deleting files.
+  - Interactive UI modal with visual baseline selector, score cutoff sliders, score distribution chart, and standalone CLI support.
+- **🔄 Session Persistence & Resilient Execution**:
+  - Auto-wrapped background `tmux` sessions (`loralab` web server and `loralab-batch` CLI runner) to protect active runs against SSH drops or terminal exits.
+  - Centralized multi-process state tracking (`logs/process_state.json`) and isolated per-process log files.
+  - Automatic Web UI state recovery and live log streaming upon browser refresh or reconnection.
+- **📈 Progressive Multi-Resolution & Constant-Resolution Modes**:
+  - Train sequentially across resolution phases (e.g., $512^2 \rightarrow 768^2 \rightarrow 1024^2$) with cross-phase weight persistence, global progress tracking, and per-phase learning rate re-warmups.
+  - Flexible single-resolution modes (`512`, `768`, `1024` or custom arbitrary resolutions like `640`, `896`).
 - **🔍 Batch Caption Search & Replace (`F2` Shortcut)**:
   - Interactive modal triggered by pressing **`F2`** or clicking **`🔍 Reemplazar (F2)`** in the dataset toolbar.
   - Real-time match counter displaying exact occurrences and affected image counts as you type.
@@ -69,11 +79,17 @@ It features an interactive web GUI with real-time VRAM/RAM monitoring, progressi
    ```bash
    ./run_LoRAlab-Krea2.sh
    ```
-   *Opens the Web GUI at `http://127.0.0.1:5000`.*
+   *Opens the Web GUI at `http://127.0.0.1:5000` (auto-managed inside `tmux` session `loralab`).*
 
 3. **Headless Batch Execution (CLI):**
    ```bash
    ./run_batch_cli.sh all
+   ```
+   *Runs inside `tmux` session `loralab-batch`. Arguments: `precache`, `train`, `all`.*
+
+4. **Dataset Curation CLI (Optional):**
+   ```bash
+   python scripts/python/0_curate_dataset.py
    ```
 
 ### Windows
@@ -97,7 +113,7 @@ It features an interactive web GUI with real-time VRAM/RAM monitoring, progressi
 ├── Run_LoRAlab-Krea2.bat             # Web GUI launcher (Windows)
 ├── Install_LoRAlab-Krea2.bat         # Installation script (Windows)
 ├── run_batch_cli.sh                  # Batch execution script (CLI / Headless)
-├── pre_cache_settings.json.example   # Template for pre-cache settings
+├── pre_cache_settings.json.example   # Template for pre-cache & curation settings
 ├── train_settings.json.example       # Template for basic training settings
 ├── train_advanced.json.example       # Template for advanced settings & presets
 ├── assets/                           # Media & project banners
@@ -105,9 +121,10 @@ It features an interactive web GUI with real-time VRAM/RAM monitoring, progressi
 │   └── trainer_ui.html               # Main Web GUI interface
 ├── scripts/
 │   ├── python/
+│   │   ├── 0_curate_dataset.py       # Face-identity dataset curation engine (CPU)
 │   │   ├── 1_pre_cache_krea2.py      # Latent & text embedding pre-caching engine
 │   │   ├── 2_train_lora_krea2.py     # Core LoRA training loop
-│   │   ├── run_progressive.py        # Multi-phase progressive training orchestrator
+│   │   ├── run_progressive.py        # Multi-phase & single-res orchestrator
 │   │   └── server.py                 # Flask web backend & REST API server
 │   ├── shell/                        # Additional Shell utilities
 │   └── batch/                        # Additional Windows batch scripts
