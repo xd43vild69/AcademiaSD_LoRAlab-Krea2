@@ -237,11 +237,16 @@ def load_curation(dataset_dir):
 
     weights = report.get("weights") or {}
     mode = report.get("mode") or "face"
+    cfg = read_json_file(PRECACHE_CONFIG, {})
+    cur_cfg = cfg.get("curation") or {}
+    baselines_by_mode = cur_cfg.get("baselines_by_mode") or {}
+
     meta = {
         "available": bool(images),
         "generated": report.get("generated"),
         "mode": mode,
         "baselines": report.get("baselines") or [],
+        "baselines_by_mode": baselines_by_mode,
         "auto_threshold": auto_threshold,
         "threshold": threshold,
         "weight_good": float(weights.get("good", 1.0)),

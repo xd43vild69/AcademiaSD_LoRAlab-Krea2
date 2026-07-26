@@ -1945,21 +1945,28 @@
             try {
                 const res = await fetch('/api/dataset-info');
                 const data = await res.json();
-                allDatasetImages = data.images || [];
-                document.getElementById('ds-count').innerText = data.image_count;
+                document.getElementById('ds-count').innerText = `${data.image_count} image(s)`;
                 document.getElementById('ds-txt-count').innerText = data.caption_count;
 
                 curationMeta = data.curation || { available: false, weight_good: 1.0, weight_bad: 0.5 };
                 curationThreshold = null;
                 curationGroupOverrides = {};
+                allDatasetImages = data.images || [];
                 allDatasetImages.forEach(img => {
                     if (img.override) curationGroupOverrides[stemOf(img.file)] = img.override;
                 });
                 if (curationMeta.threshold !== curationMeta.auto_threshold) {
                     curationThreshold = curationMeta.threshold;
                 }
-                if ((curationMeta.baselines || []).length) {
+                if (curationMeta.baselines_by_mode) {
+                    baselinesByMode = Object.assign(baselinesByMode, curationMeta.baselines_by_mode);
+                }
+                const activeMode = curationMeta.mode || 'face';
+                if (baselinesByMode[activeMode] && baselinesByMode[activeMode].length === 3) {
+                    curationBaselines = baselinesByMode[activeMode].map(stemOf);
+                } else if ((curationMeta.baselines || []).length === 3) {
                     curationBaselines = curationMeta.baselines.map(stemOf);
+                    baselinesByMode[activeMode] = curationBaselines.slice();
                 }
                 syncCurationPanel();
                 filterDatasetGrid();
@@ -1968,7 +1975,16 @@
 
         function syncCurationMode(val) {
             if (!val) return;
+            const prevMode = curationMeta.mode || 'face';
+            baselinesByMode[prevMode] = curationBaselines.slice();
             curationMeta.mode = val;
+            if (baselinesByMode[val] && baselinesByMode[val].length > 0) {
+                curationBaselines = baselinesByMode[val].slice();
+            } else {
+                curationBaselines = [];
+            }
+            syncCurationPanel();
+            filterDatasetGrid();
         }
 
         function syncCurationPanel() {
@@ -2029,6 +2045,8 @@
                 alert('Ya hay 3 baselines. Quita uno antes de añadir otro. /\nAlready 3 baselines; remove one first.');
                 return;
             } else curationBaselines.push(stem);
+            const mode = curationMeta.mode || 'face';
+            baselinesByMode[mode] = curationBaselines.slice();
             syncCurationPanel();
             filterDatasetGrid();
         }
@@ -2061,6 +2079,7 @@
                 return;
             }
             const mode = document.getElementById('curation_mode')?.value || 'face';
+            baselinesByMode[mode] = curationBaselines.slice();
             await fetch('/api/save-precache', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2069,6 +2088,7 @@
                     curation: {
                         mode: mode,
                         baselines: curationBaselines,
+                        baselines_by_mode: baselinesByMode,
                         weight_good: curationMeta.weight_good,
                         weight_bad: curationMeta.weight_bad
                     }

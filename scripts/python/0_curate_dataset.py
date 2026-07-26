@@ -30,7 +30,6 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 
 
 def from_root(path):
-    """Resuelve una ruta relativa contra la raíz del proyecto (absolutas intactas)."""
     return path if os.path.isabs(path) else os.path.normpath(os.path.join(PROJECT_ROOT, path))
 
 
@@ -41,6 +40,7 @@ DEFAULTS = {
     "curation": {
         "mode": "face",
         "baselines": [],
+        "baselines_by_mode": {},
         "weight_good": 1.0,
         "weight_bad": 0.5,
     },
@@ -68,7 +68,12 @@ MODE = str(_cur.get("mode", "face")).lower()
 if MODE not in ("face", "clothes", "body-type", "tattoo"):
     MODE = "face"
 
-BASELINES = list(_cur.get("baselines") or [])
+baselines_by_mode = _cur.get("baselines_by_mode") or {}
+if MODE in baselines_by_mode and isinstance(baselines_by_mode[MODE], list) and len(baselines_by_mode[MODE]) == 3:
+    BASELINES = list(baselines_by_mode[MODE])
+else:
+    BASELINES = list(_cur.get("baselines") or [])
+
 WEIGHT_GOOD = float(_cur.get("weight_good", DEFAULTS["curation"]["weight_good"]))
 WEIGHT_BAD = float(_cur.get("weight_bad", DEFAULTS["curation"]["weight_bad"]))
 CACHE_NAME = f".curation_cache_{MODE}.npz"
@@ -114,7 +119,7 @@ class FaceEmbedder:
                 return faces
         return []
 
-    def embed(self, image_path):
+    def embed(self, image_path, is_baseline=False):
         self._ensure_loaded()
         import cv2
         try:
@@ -197,7 +202,7 @@ class ClothesEmbedder:
     def __init__(self):
         self.clip = CLIPEmbedder()
 
-    def embed(self, image_path):
+    def embed(self, image_path, is_baseline=False):
         try:
             with Image.open(image_path) as pil:
                 rgb_img = pil.convert("RGB")
@@ -213,7 +218,7 @@ class BodyEmbedder:
     def __init__(self):
         self.clip = CLIPEmbedder()
 
-    def embed(self, image_path):
+    def embed(self, image_path, is_baseline=False):
         import cv2
         try:
             with Image.open(image_path) as pil:
@@ -222,17 +227,20 @@ class BodyEmbedder:
         except Exception:
             return None
 
-        cascade_path = cv2.data.haarcascades + 'haarcascade_fullbody.xml'
-        body_cascade = cv2.CascadeClassifier(cascade_path)
-        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-        bodies = body_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=3)
+        crop = None
+        try:
+            cascade_path = cv2.data.haarcascades + 'haarcascade_fullbody.xml'
+            body_cascade = cv2.CascadeClassifier(cascade_path)
+            gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+            bodies = body_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=3)
+            if len(bodies) > 0:
+                x, y, w, h = max(bodies, key=lambda b: b[2] * b[3])
+                crop = rgb_img.crop((x, y, x + w, y + h))
+        except Exception:
+            crop = None
 
-        if len(bodies) > 0:
-            x, y, w, h = max(bodies, key=lambda b: b[2] * b[3])
-            crop = rgb_img.crop((x, y, x + w, y + h))
-        else:
-            h, w = img_bgr.shape[:2]
-            crop = rgb_img.crop((int(w * 0.1), int(h * 0.1), int(w * 0.9), int(h * 0.9)))
+        if crop is None:
+            crop = rgb_img
 
         caption = self.clip.get_caption_text(image_path)
         return self.clip.embed_crop_and_caption(crop, caption)
@@ -244,7 +252,7 @@ class TattooEmbedder:
     def __init__(self):
         self.clip = CLIPEmbedder()
 
-    def embed(self, image_path):
+    def embed(self, image_path, is_baseline=False):
         import cv2
         try:
             with Image.open(image_path) as pil:
@@ -253,24 +261,36 @@ class TattooEmbedder:
         except Exception:
             return None
 
-        hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
-        lower_skin = np.array([0, 20, 70], dtype=np.uint8)
-        upper_skin = np.array([20, 255, 255], dtype=np.uint8)
-        skin_mask = cv2.inRange(hsv, lower_skin, upper_skin)
+        crop = None
+        try:
+            hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+            lower_skin = np.array([0, 10, 50], dtype=np.uint8)
+            upper_skin = np.array([25, 255, 255], dtype=np.uint8)
+            skin_mask = cv2.inRange(hsv, lower_skin, upper_skin)
 
-        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-        edges = cv2.Canny(gray, 100, 200)
-        tattoo_region = cv2.bitwise_and(edges, edges, mask=skin_mask)
+            gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+            edges = cv2.Canny(gray, 30, 150)
+            tattoo_region = cv2.bitwise_and(edges, edges, mask=skin_mask)
 
-        contours, _ = cv2.findContours(tattoo_region, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        valid_contours = [c for c in contours if cv2.contourArea(c) > 50]
+            contours, _ = cv2.findContours(tattoo_region, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            valid_contours = [c for c in contours if cv2.contourArea(c) > 20]
 
-        if not valid_contours:
+            if valid_contours:
+                all_pts = np.vstack(valid_contours)
+                x, y, w, h = cv2.boundingRect(all_pts)
+                if w > 10 and h > 10:
+                    crop = rgb_img.crop((max(0, x - 10), max(0, y - 10), min(rgb_img.width, x + w + 10), min(rgb_img.height, y + h + 10)))
+        except Exception:
+            crop = None
+
+        if crop is None:
+            if is_baseline:
+                crop = rgb_img
+            else:
+                crop = None
+
+        if crop is None:
             return None
-
-        all_pts = np.vstack(valid_contours)
-        x, y, w, h = cv2.boundingRect(all_pts)
-        crop = rgb_img.crop((max(0, x - 10), max(0, y - 10), x + w + 10, y + h + 10))
 
         caption = self.clip.get_caption_text(image_path)
         return self.clip.embed_crop_and_caption(crop, caption)
@@ -364,7 +384,7 @@ def curate():
         return 1
 
     if len(BASELINES) != 3:
-        print(f"\n[!] Hacen falta exactamente 3 baselines (hay {len(BASELINES)}) / "
+        print(f"\n[!] Hacen falta exactamente 3 baselines para el modo {MODE.upper()} (hay {len(BASELINES)}) / "
               f"exactly 3 baselines required.")
         return 1
 
@@ -379,14 +399,14 @@ def curate():
     embs, fps = load_cache(DATASET_PATH)
     cache_hits = 0
 
-    def embed_cached(path, key):
+    def embed_cached(path, key, is_baseline=False):
         nonlocal cache_hits
         fp = fingerprint(path)
         if key in embs and fps.get(key) == fp:
             cache_hits += 1
             cached = embs[key]
             return None if cached.size == 0 else cached
-        emb = embedder.embed(path)
+        emb = embedder.embed(path, is_baseline=is_baseline)
         embs[key] = np.zeros(0, dtype=np.float32) if emb is None else emb
         fps[key] = fp
         return emb
@@ -396,13 +416,13 @@ def curate():
     base_missing = []
     for name, path in resolved:
         key = os.path.basename(path) if os.path.dirname(path) == DATASET_PATH else path
-        emb = embed_cached(path, key)
+        emb = embed_cached(path, key, is_baseline=True)
         if emb is None:
             base_missing.append(os.path.basename(path))
         base_embs.append(emb)
 
     if base_missing:
-        print(f"\n[!] No se detectó la característica ({MODE}) en estos baselines: {', '.join(base_missing)}")
+        print(f"\n[!] No se pudo procesar la característica ({MODE}) en estos baselines: {', '.join(base_missing)}")
         save_cache(DATASET_PATH, embs, fps)
         return 1
 
@@ -412,7 +432,7 @@ def curate():
     for i, fname in enumerate(files, 1):
         path = os.path.join(DATASET_PATH, fname)
         stem = os.path.splitext(fname)[0]
-        emb = embed_cached(path, fname)
+        emb = embed_cached(path, fname, is_baseline=False)
         scores[stem] = None if emb is None else float(np.mean([float(np.dot(b, emb))
                                                                for b in base_embs]))
         print(f"\rPuntuando... {i}/{len(files)}", end="", flush=True)
@@ -444,8 +464,6 @@ def curate():
     os.replace(tmp, report_path)
 
     # ── Resumen / Summary ────────────────────────────────────────────────────
-    # Para face: no detectado va a BUENO por defecto.
-    # Para clothes, body-type, tattoo: no detectado va a BAJO (low-quality) por defecto.
     if threshold is None:
         if MODE == "face":
             good, bad = len(scores), 0
