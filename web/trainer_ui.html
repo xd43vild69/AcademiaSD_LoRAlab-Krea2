@@ -553,7 +553,13 @@
         .card-btn:hover { color: var(--text); }
 
         .star { right: 28px; }
-        .star.on { opacity: 1; color: var(--warn); }
+        .star.on {
+            opacity: 1 !important;
+            color: #ffc107 !important;
+            background: rgba(245, 158, 11, 0.35) !important;
+            border: 1px solid #f59e0b !important;
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+        }
         .edit { right: var(--s2); }
 
         .score-badge {
@@ -2039,12 +2045,16 @@
 
         function toggleBaseline(file) {
             const stem = stemOf(file);
-            const at = curationBaselines.indexOf(stem);
-            if (at >= 0) curationBaselines.splice(at, 1);
-            else if (curationBaselines.length >= 3) {
+            let at = curationBaselines.indexOf(stem);
+            if (at < 0) at = curationBaselines.indexOf(file);
+            if (at >= 0) {
+                curationBaselines.splice(at, 1);
+            } else if (curationBaselines.length >= 3) {
                 alert('Ya hay 3 baselines. Quita uno antes de añadir otro. /\nAlready 3 baselines; remove one first.');
                 return;
-            } else curationBaselines.push(stem);
+            } else {
+                curationBaselines.push(stem);
+            }
             const mode = curationMeta.mode || 'face';
             baselinesByMode[mode] = curationBaselines.slice();
             syncCurationPanel();
@@ -2120,14 +2130,15 @@
             let scoreBadge = '';
             if (curationMeta.available) {
                 if (img.score === null || img.score === undefined) {
-                    scoreBadge = `<span class="score-badge noface" title="No face detected — non-scorable is kept in good group">no face</span>`;
+                    const noLabel = curationMeta.mode === 'face' ? 'no face' : 'no target';
+                    scoreBadge = `<span class="score-badge noface" title="No ${curationMeta.mode || 'feature'} detected">${noLabel}</span>`;
                 } else {
                     scoreBadge = `<span class="score-badge ${group}">${Math.round(img.score * 100)}%</span>`;
                 }
             }
             const isOverride = !!curationGroupOverrides[stemOf(img.file)];
             const ovrBadge = isOverride ? `<span class="ovr-badge" title="Manually reassigned">manual</span>` : '';
-            const isBase = curationBaselines.includes(stemOf(img.file));
+            const isBase = curationBaselines.includes(stemOf(img.file)) || curationBaselines.includes(img.file);
             const safeFile = escapeHtml(img.file);
 
             card.innerHTML = `
