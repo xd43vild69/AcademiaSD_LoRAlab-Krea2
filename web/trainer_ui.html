@@ -511,6 +511,180 @@
             background: #0f172a;
         }
 
+        /* ── Curaduría: dos grupos ─────────────────────────────────────────── */
+
+        .cur-panel {
+            background: #0f172a;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 14px;
+        }
+
+        .cur-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .cur-row + .cur-row {
+            margin-top: 10px;
+        }
+
+        .cur-chip {
+            background: #1e293b;
+            border: 1px solid var(--panel-border);
+            border-radius: 999px;
+            padding: 3px 10px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .cur-chip.set {
+            border-color: #f1c40f;
+            color: #f1c40f;
+        }
+
+        .cur-slider {
+            flex: 1;
+            min-width: 160px;
+            accent-color: var(--accent);
+        }
+
+        .cur-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            line-height: 1.45;
+        }
+
+        .ds-group-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin: 14px 0 8px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border-left: 4px solid var(--panel-border);
+            background: #0f172a;
+        }
+
+        .ds-group-head.good {
+            border-left-color: var(--success);
+            color: var(--success);
+        }
+
+        .ds-group-head.bad {
+            border-left-color: var(--warning);
+            color: var(--warning);
+        }
+
+        .ds-group-head .weight-tag {
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .ds-card.grp-good {
+            border-color: rgba(16, 185, 129, 0.55);
+        }
+
+        .ds-card.grp-bad {
+            border-color: rgba(245, 158, 11, 0.55);
+        }
+
+        .score-badge {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            padding: 1px 6px;
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            background: rgba(15, 23, 42, 0.88);
+            border: 1px solid currentColor;
+            z-index: 2;
+        }
+
+        .score-badge.good {
+            color: #34d399;
+        }
+
+        .score-badge.bad {
+            color: #fbbf24;
+        }
+
+        /* Sin cara detectada: no puntuable no es lo mismo que mala, así que se
+           marca en gris neutro y se queda en el grupo bueno. */
+        .score-badge.noface {
+            color: #94a3b8;
+        }
+
+        .ovr-badge {
+            position: absolute;
+            bottom: 22px;
+            left: 6px;
+            font-size: 0.62rem;
+            font-weight: 700;
+            color: #c4b5fd;
+            background: rgba(15, 23, 42, 0.88);
+            border: 1px solid currentColor;
+            border-radius: 999px;
+            padding: 1px 6px;
+            z-index: 2;
+        }
+
+        .card-btn {
+            position: absolute;
+            top: 4px;
+            width: 20px;
+            height: 20px;
+            line-height: 18px;
+            text-align: center;
+            border-radius: 5px;
+            font-size: 0.72rem;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--panel-border);
+            color: var(--text-muted);
+            cursor: pointer;
+            z-index: 3;
+            opacity: 0;
+            transition: opacity 0.12s;
+        }
+
+        .ds-card:hover .card-btn {
+            opacity: 1;
+        }
+
+        .card-btn:hover {
+            border-color: var(--accent);
+            color: #f8fafc;
+        }
+
+        .card-btn.star {
+            right: 26px;
+        }
+
+        /* Un baseline elegido se ve siempre, no sólo al pasar por encima. */
+        .card-btn.star.on {
+            opacity: 1;
+            color: #f1c40f;
+            border-color: #f1c40f;
+        }
+
+        .card-btn.edit {
+            right: 4px;
+        }
+
+        .ds-empty {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-style: italic;
+            padding: 10px 4px;
+        }
+
         .gallery {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -743,12 +917,16 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Progressive Resolution / Resolución Progresiva:</label>
+                    <label>Resolution Mode / Modo de Resolución:</label>
                     <select id="progressive_mode" onchange="syncProgressive(this.value)">
-                        <option value="off" selected>Off / Única resolución</option>
+                        <option value="off" selected>Off / Clásico (caché plana, resolución libre abajo)</option>
+                        <option value="512">512² constante</option>
+                        <option value="768">768² constante</option>
+                        <option value="1024">1024² constante</option>
                         <option value="768_1024">768² → 1024² (2 fases)</option>
                         <option value="512_768_1024">512² → 768² → 1024² (3 fases)</option>
                     </select>
+                    <small id="progressive_hint" style="display:block;margin-top:4px;opacity:.75"></small>
                 </div>
 
                 <div class="form-group" id="single_res_group">
@@ -977,7 +1155,39 @@
                             Actualizar</button>
                     </div>
                 </div>
-                <div class="ds-grid" id="ds-grid"></div>
+
+                <!-- Curaduría: reparte el dataset en dos grupos por identidad
+                     facial. Corre ANTES del pre-caché; al entrenar, cada grupo
+                     lleva su propio peso. Nada se borra ni se mueve. -->
+                <div class="cur-panel">
+                    <div class="cur-row">
+                        <strong style="font-size:0.9rem;">🎯 Curaduría / Curation</strong>
+                        <span class="cur-chip" id="cur-base-0">baseline 1</span>
+                        <span class="cur-chip" id="cur-base-1">baseline 2</span>
+                        <span class="cur-chip" id="cur-base-2">baseline 3</span>
+                        <button type="button" class="btn btn-primary btn-sm" id="btn-curate"
+                            onclick="runCurate()">Puntuar / Score</button>
+                    </div>
+                    <div class="cur-row" id="cur-threshold-row" style="display:none;">
+                        <span style="font-size:0.78rem; color:var(--text-muted); white-space:nowrap;">
+                            Umbral / Threshold</span>
+                        <input type="range" class="cur-slider" id="cur-threshold" min="0" max="100" step="1"
+                            oninput="onThresholdInput(this.value)">
+                        <span id="cur-threshold-val"
+                            style="font-size:0.8rem; font-weight:700; min-width:38px;">--</span>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="resetThreshold()"
+                            title="Volver al umbral calculado automáticamente">Auto</button>
+                        <button type="button" class="btn btn-success btn-sm" onclick="saveCurationOverrides()">
+                            Guardar grupos</button>
+                    </div>
+                    <div class="cur-hint" id="cur-hint">
+                        Elige con ★ las <strong>3 imágenes</strong> que mejor representan el look que buscas y
+                        pulsa Puntuar. Se usan tres y se promedia porque una sola foto mete su propio sesgo de
+                        ángulo, expresión e iluminación en la nota de todas las demás.
+                    </div>
+                </div>
+
+                <div id="ds-groups"></div>
             </div>
 
             <!-- Previews -->
@@ -1133,18 +1343,41 @@
             '1048576': '~10.3 GB de VRAM · ajustado en 12 GB, requiere GPU libre'
         };
 
-        // Preset progresivo -> lista de áreas para el pre-cache.
+        // Modo de resolución -> lista de áreas que produce el pre-cache.
+        // Una sola área = subdir único (resolución constante); varias = fases.
         const PROGRESSIVE_RESOLUTIONS = {
             'off': [],
+            '512': [262144],
+            '768': [589824],
+            '1024': [1048576],
             '768_1024': [589824, 1048576],
             '512_768_1024': [262144, 589824, 1048576]
         };
 
+        const PROGRESSIVE_HINTS = {
+            'off': 'Caché plana en la carpeta del proyecto; la resolución la eliges abajo.',
+            '512': 'Todos los pasos a 512². Salida en phase0_512/ · ' + VRAM_HINTS['262144'],
+            '768': 'Todos los pasos a 768². Salida en phase0_768/ · ' + VRAM_HINTS['589824'],
+            '1024': 'Todos los pasos a 1024². Salida en phase0_1024/ · ' + VRAM_HINTS['1048576'],
+            '768_1024': 'Dos fases con hand-off de pesos (70% / 30%). Pico de VRAM: el de 1024².',
+            '512_768_1024': 'Tres fases con hand-off de pesos (40% / 30% / 30%). Pico de VRAM: el de 1024².'
+        };
+
         function syncProgressive(val) {
-            // En modo progresivo, el pico de VRAM lo marca la última fase; se oculta
-            // el selector de resolución única porque las resoluciones las fija el preset.
+            // Con un modo por subdirs (constante o progresivo) la resolución la fija
+            // el propio modo, así que se oculta el selector de resolución libre.
             const single = document.getElementById('single_res_group');
             if (single) single.style.display = (val && val !== 'off') ? 'none' : 'block';
+            const hint = document.getElementById('progressive_hint');
+            if (hint) {
+                let text = PROGRESSIVE_HINTS[val] || '';
+                // Las constantes reutilizan los subdirs que deja un pre-cache
+                // progresivo: si ya existen, no hace falta volver a cachear.
+                if (val && val !== 'off' && !val.includes('_')) {
+                    text += ' Si ya pre-cacheaste en modo progresivo, el subdir ya existe y puedes entrenar sin repetir el Pre-Caché.';
+                }
+                hint.textContent = text;
+            }
         }
 
         function syncResolution(val) {
@@ -1204,10 +1437,14 @@
                     if (t.export_final_name) document.getElementById('export_final_name').value = t.export_final_name;
                     if (t.progressive) document.getElementById('progressive_mode').value = t.progressive;
                 }
-                // Si no vino de train, derivar el preset del pre-cache (resolutions).
-                if ((!data.train || !data.train.progressive) && data.pre_cache && Array.isArray(data.pre_cache.resolutions) && data.pre_cache.resolutions.length > 1) {
-                    const n = data.pre_cache.resolutions.length;
-                    document.getElementById('progressive_mode').value = (n === 3) ? '512_768_1024' : '768_1024';
+                // Si no vino de train, derivar el modo del pre-cache (resolutions).
+                if ((!data.train || !data.train.progressive) && data.pre_cache && Array.isArray(data.pre_cache.resolutions) && data.pre_cache.resolutions.length >= 1) {
+                    const areas = data.pre_cache.resolutions;
+                    // Una sola área = resolución constante, etiquetada como el subdir
+                    // que genera el pre-cache: round(sqrt(area)).
+                    document.getElementById('progressive_mode').value =
+                        (areas.length === 1) ? String(Math.round(Math.sqrt(areas[0])))
+                        : (areas.length === 3) ? '512_768_1024' : '768_1024';
                 }
                 syncProgressive(document.getElementById('progressive_mode').value);
                 updateProjectPaths();
@@ -1503,6 +1740,39 @@
             }
         }
 
+        // ── Curaduría / Curation ──────────────────────────────────────────────
+        // El servidor entrega el informe y los ajustes ya fusionados; aquí sólo
+        // se replica la resolución de grupo para que mover el slider repueble los
+        // dos grupos al instante, sin ida y vuelta al servidor.
+        let curationMeta = { available: false, weight_good: 1.0, weight_bad: 0.5 };
+        let curationThreshold = null;     // null = usar el automático del informe
+        let curationGroupOverrides = {};  // stem -> "good" | "bad"
+        let curationBaselines = [];       // stems, exactamente 3 para poder puntuar
+        let dsGridMode = 'normal';
+        let dsGridHidden = false;
+
+        function stemOf(file) {
+            const i = file.lastIndexOf('.');
+            return i > 0 ? file.slice(0, i) : file;
+        }
+
+        function effectiveThreshold() {
+            return curationThreshold !== null ? curationThreshold : curationMeta.auto_threshold;
+        }
+
+        /* Réplica de resolve_curation_group() en server.py y _curation_group() en
+           2_train_lora_krea2.py. Si cambia una, cambian las tres, o la UI enseñaría
+           un reparto distinto del que se entrena. */
+        function groupOf(img) {
+            const ovr = curationGroupOverrides[stemOf(img.file)];
+            if (ovr === 'good' || ovr === 'bad') return ovr;
+            const thr = effectiveThreshold();
+            // Sin cara detectada -> grupo bueno: no puntuable no es lo mismo que
+            // mala (un plano de espalda es material legítimo).
+            if (img.score === null || img.score === undefined || thr === null || thr === undefined) return 'good';
+            return img.score >= thr ? 'good' : 'bad';
+        }
+
         async function loadDatasetInfo() {
             try {
                 const res = await fetch('/api/dataset-info');
@@ -1510,31 +1780,219 @@
                 allDatasetImages = data.images || [];
                 document.getElementById('ds-count').innerText = data.image_count;
                 document.getElementById('ds-txt-count').innerText = data.caption_count;
-                renderDatasetGrid(allDatasetImages);
+
+                curationMeta = data.curation || { available: false, weight_good: 1.0, weight_bad: 0.5 };
+                curationThreshold = null;
+                curationGroupOverrides = {};
+                allDatasetImages.forEach(img => {
+                    if (img.override) curationGroupOverrides[stemOf(img.file)] = img.override;
+                });
+                if (curationMeta.threshold !== curationMeta.auto_threshold) {
+                    curationThreshold = curationMeta.threshold;
+                }
+                if ((curationMeta.baselines || []).length) {
+                    curationBaselines = curationMeta.baselines.map(stemOf);
+                }
+                syncCurationPanel();
+                filterDatasetGrid();
             } catch (e) { }
         }
 
+        function syncCurationPanel() {
+            for (let i = 0; i < 3; i++) {
+                const chip = document.getElementById(`cur-base-${i}`);
+                const name = curationBaselines[i];
+                chip.innerText = name || `baseline ${i + 1}`;
+                chip.classList.toggle('set', !!name);
+            }
+            const thr = effectiveThreshold();
+            const row = document.getElementById('cur-threshold-row');
+            row.style.display = curationMeta.available ? 'flex' : 'none';
+            if (curationMeta.available && thr !== null && thr !== undefined) {
+                document.getElementById('cur-threshold').value = Math.round(thr * 100);
+                document.getElementById('cur-threshold-val').innerText = `${Math.round(thr * 100)}%`;
+            }
+            document.getElementById('btn-curate').innerText =
+                curationMeta.available ? 'Re-puntuar / Re-score' : 'Puntuar / Score';
+        }
+
+        function onThresholdInput(value) {
+            curationThreshold = parseInt(value, 10) / 100;
+            document.getElementById('cur-threshold-val').innerText = `${value}%`;
+            filterDatasetGrid();
+        }
+
+        function resetThreshold() {
+            curationThreshold = null;
+            syncCurationPanel();
+            filterDatasetGrid();
+        }
+
+        function toggleGroup(file) {
+            const stem = stemOf(file);
+            const img = allDatasetImages.find(i => i.file === file);
+            if (!img) return;
+            const current = groupOf(img);
+            const target = current === 'good' ? 'bad' : 'good';
+            // Si la reasignación coincide con lo que ya dice el umbral, se borra
+            // en vez de guardarse: persistir un override redundante convertiría
+            // un cambio de umbral posterior en un no-op silencioso.
+            const thr = effectiveThreshold();
+            const auto = (img.score === null || img.score === undefined || thr === null || thr === undefined)
+                ? 'good' : (img.score >= thr ? 'good' : 'bad');
+            if (target === auto) delete curationGroupOverrides[stem];
+            else curationGroupOverrides[stem] = target;
+            filterDatasetGrid();
+        }
+
+        function toggleBaseline(file) {
+            const stem = stemOf(file);
+            const at = curationBaselines.indexOf(stem);
+            if (at >= 0) curationBaselines.splice(at, 1);
+            else if (curationBaselines.length >= 3) {
+                alert('Ya hay 3 baselines. Quita uno antes de añadir otro. /\nAlready 3 baselines; remove one first.');
+                return;
+            } else curationBaselines.push(stem);
+            syncCurationPanel();
+            filterDatasetGrid();
+        }
+
+        async function saveCurationOverrides() {
+            const res = await fetch('/api/curation-overrides', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ threshold: curationThreshold, groups: curationGroupOverrides })
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                alert(`✓ Grupos guardados / Groups saved:\n\n` +
+                    `  Buena calificación : ${data.good_count} (×${curationMeta.weight_good})\n` +
+                    `  Baja calificación  : ${data.bad_count} (×${curationMeta.weight_bad})\n` +
+                    `  Reasignadas a mano : ${data.override_count}\n\n` +
+                    `Se aplicarán al entrenar. / Applied on training.`);
+            } else {
+                alert(`Error: ${data.error}`);
+            }
+        }
+
+        async function runCurate() {
+            if (curationBaselines.length !== 3) {
+                alert('Marca con ★ exactamente 3 imágenes baseline ' +
+                    `(llevas ${curationBaselines.length}). /\n` +
+                    'Star exactly 3 baseline images.\n\n' +
+                    'Se usan tres y se promedia porque una sola foto mete su propio sesgo de ángulo, ' +
+                    'expresión e iluminación en la nota de todas las demás.');
+                return;
+            }
+            // Se persisten en pre_cache_settings.json: el servidor hace merge, así
+            // que el resto de la configuración no se toca.
+            await fetch('/api/save-precache', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    dataset_path: document.getElementById('dataset_path').value,
+                    curation: {
+                        baselines: curationBaselines,
+                        weight_good: curationMeta.weight_good,
+                        weight_bad: curationMeta.weight_bad
+                    }
+                })
+            });
+            await startScript('curate');
+            await loadDatasetInfo();
+        }
+
+        function makeCard(img) {
+            const card = document.createElement('div');
+            const group = curationMeta.available ? groupOf(img) : null;
+            card.className = 'ds-card' + (group ? ` grp-${group}` : '');
+
+            const hasCaption = img.has_txt && img.caption && img.caption.trim().length > 0;
+            const dotClass = hasCaption ? 'caption-dot dot-green' : 'caption-dot dot-red';
+            const dotTitle = hasCaption ? 'Caption OK / Texto existente' : 'No Caption / Sin texto';
+
+            let scoreBadge = '';
+            if (curationMeta.available) {
+                if (img.score === null || img.score === undefined) {
+                    scoreBadge = `<span class="score-badge noface" title="No se detectó cara — no puntuable no es lo mismo que mala; se queda en el grupo bueno">sin cara</span>`;
+                } else {
+                    scoreBadge = `<span class="score-badge ${group}">${Math.round(img.score * 100)}%</span>`;
+                }
+            }
+            const isOverride = !!curationGroupOverrides[stemOf(img.file)];
+            const ovrBadge = isOverride ? `<span class="ovr-badge" title="Reasignada a mano">manual</span>` : '';
+            const isBase = curationBaselines.includes(stemOf(img.file));
+            const safeFile = escapeHtml(img.file);
+
+            card.innerHTML = `
+                <div class="img-wrapper">
+                    <img src="/api/dataset-image/${encodeURIComponent(img.file)}" alt="${safeFile}">
+                    <span class="${dotClass}" title="${dotTitle}"></span>
+                    ${scoreBadge}${ovrBadge}
+                    <div class="card-btn star${isBase ? ' on' : ''}" title="Usar como baseline">★</div>
+                    <div class="card-btn edit" title="Editar caption">✎</div>
+                    <div class="img-filename-tag">${safeFile}</div>
+                </div>
+                <div class="caption">${img.caption ? escapeHtml(img.caption) : '<em>No .txt caption / Sin texto</em>'}</div>
+            `;
+            card.querySelector('.star').onclick = (e) => { e.stopPropagation(); toggleBaseline(img.file); };
+            card.querySelector('.edit').onclick = (e) => {
+                e.stopPropagation();
+                openModal(`/api/dataset-image/${encodeURIComponent(img.file)}`, img.file, img.caption || '');
+            };
+            // Con curaduría activa el clic reasigna de grupo (la acción principal
+            // aquí); sin curar mantiene el comportamiento de siempre.
+            card.onclick = curationMeta.available
+                ? () => toggleGroup(img.file)
+                : () => openModal(`/api/dataset-image/${encodeURIComponent(img.file)}`, img.file, img.caption || '');
+            return card;
+        }
+
+        function gridClass() {
+            return 'ds-grid' + (dsGridMode === 'compact' ? ' compact' : dsGridMode === 'large' ? ' large' : '')
+                + (dsGridHidden ? ' hidden' : '');
+        }
+
         function renderDatasetGrid(images) {
-            const grid = document.getElementById('ds-grid');
-            grid.innerHTML = '';
-            images.forEach(img => {
-                const card = document.createElement('div');
-                card.className = 'ds-card';
-                card.onclick = () => openModal(`/api/dataset-image/${img.file}`, img.file, img.caption || '');
+            const host = document.getElementById('ds-groups');
+            host.innerHTML = '';
 
-                const hasCaption = img.has_txt && img.caption && img.caption.trim().length > 0;
-                const dotClass = hasCaption ? 'caption-dot dot-green' : 'caption-dot dot-red';
-                const dotTitle = hasCaption ? 'Caption OK / Texto existente' : 'No Caption / Sin texto';
+            if (!curationMeta.available) {
+                const grid = document.createElement('div');
+                grid.className = gridClass();
+                images.forEach(img => grid.appendChild(makeCard(img)));
+                host.appendChild(grid);
+                return;
+            }
 
-                card.innerHTML = `
-                    <div class="img-wrapper">
-                        <img src="/api/dataset-image/${img.file}" alt="${img.file}">
-                        <span class="${dotClass}" title="${dotTitle}"></span>
-                        <div class="img-filename-tag">${img.file}</div>
-                    </div>
-                    <div class="caption">${img.caption || '<em>No .txt caption / Sin texto</em>'}</div>
-                `;
-                grid.appendChild(card);
+            const good = images.filter(i => groupOf(i) === 'good');
+            const bad = images.filter(i => groupOf(i) === 'bad');
+
+            [['good', '✅ Buena calificación / Good', good, curationMeta.weight_good],
+             ['bad', '⚠️ Baja calificación / Low', bad, curationMeta.weight_bad]
+            ].forEach(([key, label, list, weight]) => {
+                const head = document.createElement('div');
+                head.className = `ds-group-head ${key}`;
+                head.innerHTML = `<span>${label} — ${list.length} imagen(es)</span>` +
+                    `<span class="weight-tag">peso ×${weight}</span>`;
+                host.appendChild(head);
+
+                const grid = document.createElement('div');
+                grid.className = gridClass();
+                if (!list.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'ds-empty';
+                    empty.innerText = key === 'bad'
+                        ? 'Ninguna imagen por debajo del umbral. / No images below the threshold.'
+                        : 'Ninguna imagen por encima del umbral. / No images above the threshold.';
+                    grid.appendChild(empty);
+                } else {
+                    // Peores primero dentro de cada grupo: lo que hay que revisar
+                    // primero es siempre lo que está más cerca de la frontera.
+                    list.slice().sort((a, b) => (a.score ?? 2) - (b.score ?? 2))
+                        .forEach(img => grid.appendChild(makeCard(img)));
+                }
+                host.appendChild(grid);
             });
         }
 
@@ -1547,23 +2005,17 @@
         }
 
         function setGridMode(mode) {
-            const grid = document.getElementById('ds-grid');
-            grid.classList.remove('compact', 'large', 'hidden');
-            if (mode === 'compact') grid.classList.add('compact');
-            if (mode === 'large') grid.classList.add('large');
+            dsGridMode = mode;
+            dsGridHidden = false;
             document.getElementById('btn-toggle-ds').innerText = 'Hide / Ocultar';
+            filterDatasetGrid();
         }
 
         function toggleDatasetGrid() {
-            const grid = document.getElementById('ds-grid');
-            const btn = document.getElementById('btn-toggle-ds');
-            if (grid.classList.contains('hidden')) {
-                grid.classList.remove('hidden');
-                btn.innerText = 'Hide / Ocultar';
-            } else {
-                grid.classList.add('hidden');
-                btn.innerText = 'Show / Mostrar';
-            }
+            dsGridHidden = !dsGridHidden;
+            document.getElementById('btn-toggle-ds').innerText =
+                dsGridHidden ? 'Show / Mostrar' : 'Hide / Ocultar';
+            filterDatasetGrid();
         }
 
         async function addTriggerToAllCaptions() {
@@ -1816,8 +2268,7 @@
         document.addEventListener('keydown', function(e) {
             if (e.key === 'F2') {
                 e.preventDefault();
-                const grid = document.getElementById('ds-grid');
-                if (grid && grid.classList.contains('hidden')) {
+                if (dsGridHidden) {
                     toggleDatasetGrid();
                 }
                 openBatchReplaceModal();

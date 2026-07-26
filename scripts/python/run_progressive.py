@@ -48,6 +48,18 @@ OUTPUT_ROOT = str(PROJECT_ROOT / "output_local")
 # Los flags de checkpointing por fase son conservadores por defecto (True);
 # se pueden afinar tras medir la VRAM real de cada resolución.
 PRESETS = {
+    # ── Resolución constante (una sola fase, todos los pasos) ────────────────
+    # Mismo pipeline que el progresivo, pero sin hand-off entre fases. Sirven
+    # para experimentar a una resolución fija reutilizando la caché por subdirs:
+    # si ya pre-cacheaste en modo progresivo, los subdirs 512/, 768/ y 1024/ ya
+    # existen y puedes correr cualquiera de estos sin volver a pre-cachear.
+    # La salida va a phase0_<label>/, así que 512, 768 y 1024 no se pisan entre
+    # sí y se pueden comparar dentro del mismo proyecto.
+    "512":  [{"label": "512",  "portion": 1.0, "gc": True}],
+    "768":  [{"label": "768",  "portion": 1.0, "gc": True}],
+    "1024": [{"label": "1024", "portion": 1.0, "gc": True}],
+
+    # ── Progresivos (multi-fase con hand-off de pesos) ───────────────────────
     "768_1024": [
         {"label": "768",  "portion": 0.70, "gc": True},
         {"label": "1024", "portion": 0.30, "gc": True},
@@ -171,11 +183,18 @@ def main():
     if preset in ("off", "", "none"):
         print("[!] 'progressive' is off; nothing to orchestrate. Run the trainer directly.")
         return 1
-    if preset not in PRESETS:
-        print(f"[!] Unknown progressive preset '{preset}'. Options: {list(PRESETS)}")
+    if preset in PRESETS:
+        phases = [dict(p) for p in PRESETS[preset]]
+    elif preset.isdigit():
+        # Cualquier resolución constante, no sólo las tres con preset propio:
+        # el label es el nombre del subdir que genera el pre-cache, que es
+        # round(sqrt(area)). Así "640" o "896" funcionan sin tocar este fichero.
+        phases = [{"label": preset, "portion": 1.0, "gc": True}]
+        print(f"[i] Constant-resolution run at {preset}² / resolución constante.")
+    else:
+        print(f"[!] Unknown resolution mode '{preset}'. Options: {list(PRESETS)} "
+              f"or a bare resolution like \"640\" / o una resolución suelta.")
         return 1
-
-    phases = [dict(p) for p in PRESETS[preset]]
     portions = cfg.get("phase_portions")
     if isinstance(portions, list) and len(portions) == len(phases):
         for p, val in zip(phases, portions):
@@ -195,7 +214,10 @@ def main():
 
     PHASE_SETTINGS_DIR.mkdir(exist_ok=True)
     print("=" * 70)
-    print(f"PROGRESSIVE TRAINING / ENTRENAMIENTO PROGRESIVO: {preset}")
+    if len(phases) == 1:
+        print(f"CONSTANT-RESOLUTION TRAINING / RESOLUCIÓN CONSTANTE: {phases[0]['label']}²")
+    else:
+        print(f"PROGRESSIVE TRAINING / ENTRENAMIENTO PROGRESIVO: {preset}")
     print(f"  Cache base   : {cache_base}")
     print(f"  Output base  : {output_base}")
     print(f"  Total steps  : {total_steps}")
@@ -203,7 +225,8 @@ def main():
     if not resuming:
         print("  Los checkpoints de runs anteriores se descartan / Previous-run checkpoints are discarded.")
     for i, (p, sc) in enumerate(zip(phases, step_counts)):
-        print(f"  Fase {i}: {p['label']}²  {sc} pasos  gc={'ON' if p['gc'] else 'OFF'}")
+        prefix = "  Resolución" if len(phases) == 1 else f"  Fase {i}:"
+        print(f"{prefix} {p['label']}²  {sc} pasos  gc={'ON' if p['gc'] else 'OFF'}")
     print("=" * 70, flush=True)
 
     prev_resume = None
@@ -217,8 +240,9 @@ def main():
         label = phase["label"]
         phase_cache = os.path.join(cache_base, label)
         if not os.path.isdir(phase_cache):
-            print(f"\n[!] Cache subdir not found for phase {i}: {phase_cache}")
-            print("[!] ¿Ejecutaste el Pre-Caché en modo progresivo? / Did you run the progressive Pre-Cache?")
+            print(f"\n[!] Cache subdir not found: {phase_cache}")
+            print(f"[!] Ejecuta el Pre-Caché con la resolución {label}² en la lista "
+                  f"'resolutions' / run the Pre-Cache including {label}².")
             return 1
 
         phase_output = phase_outputs[i]
@@ -251,7 +275,10 @@ def main():
             json.dump(phase_cfg, f, indent=2, ensure_ascii=False)
 
         print(f"\n{'#' * 70}")
-        print(f"# FASE {i+1}/{len(phases)} — {label}²  ({sc} pasos)")
+        if len(phases) == 1:
+            print(f"# {label}²  ({sc} pasos)")
+        else:
+            print(f"# FASE {i+1}/{len(phases)} — {label}²  ({sc} pasos)")
         print(f"{'#' * 70}", flush=True)
 
         env = dict(os.environ)
@@ -284,19 +311,22 @@ def main():
     if prev_resume and not _stop_requested:
         last_output = os.path.dirname(prev_resume)
         last_lora = os.path.join(last_output, "Krea2_FINAL_LoRA.safetensors")
-        final_name = str(cfg.get("export_final_name", "")).strip() or "Krea2_Progressive_FINAL.safetensors"
+        default_name = (f"Krea2_{phases[0]['label']}_FINAL.safetensors" if len(phases) == 1
+                        else "Krea2_Progressive_FINAL.safetensors")
+        final_name = str(cfg.get("export_final_name", "")).strip() or default_name
         dest_dir = str(cfg.get("export_models_dir", "")).strip() or output_base
         os.makedirs(dest_dir, exist_ok=True)
         dest = os.path.join(dest_dir, final_name)
         if os.path.exists(last_lora):
             try:
                 shutil.copy2(last_lora, dest)
-                print(f"\n✓ Final progressive LoRA / LoRA progresivo final: {dest}")
+                print(f"\n✓ Final LoRA / LoRA final: {dest}")
             except Exception as exc:
                 print(f"[!] Could not copy final LoRA / No se pudo copiar el LoRA final: {exc}")
 
     dt = time.time() - t0_all
-    print(f"\n✓ Progressive pipeline finished in / Pipeline progresivo terminado en "
+    kind = "Run" if len(phases) == 1 else "Progressive pipeline"
+    print(f"\n✓ {kind} finished in / terminado en "
           f"{int(dt//3600):02d}:{int((dt%3600)//60):02d}:{int(dt%60):02d}")
     return 0
 

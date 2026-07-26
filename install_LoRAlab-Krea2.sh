@@ -79,6 +79,12 @@ echo "[INFO] Instalando Diffusers, Transformers, PEFT, Accelerate, Safetensors y
 echo "[INFO] Instalando BitsAndBytes y utilidades..."
 "$VENV_PYTHON" -m pip install bitsandbytes sentencepiece protobuf psutil
 
+# Curaduría del dataset (0_curate_dataset.py): puntuación de identidad facial
+# con ArcFace. CPU-only; el modelo (~300 MB) se descarga en el primer uso.
+echo "[INFO] Instalando InsightFace para la curaduría del dataset..."
+"$VENV_PYTHON" -m pip install insightface onnxruntime opencv-python || \
+    echo "[AVISO] InsightFace no se pudo instalar; la curaduría no estará disponible. El resto del entrenador funciona igualmente."
+
 # 8. Verificación final
 echo ""
 echo "========================================================"

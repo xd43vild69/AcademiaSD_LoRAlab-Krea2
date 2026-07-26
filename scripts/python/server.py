@@ -5,6 +5,7 @@ Web backend for AcademiaSD Krea-2 Trainer
 """
 
 import json
+import math
 import os
 import subprocess
 import sys
@@ -83,9 +84,16 @@ LOGO_FILE = ASSETS_DIR / "logo.png" if (ASSETS_DIR / "logo.png").exists() else P
 PRECACHE_CONFIG = PROJECT_ROOT / "pre_cache_settings.json"
 TRAIN_CONFIG = PROJECT_ROOT / "train_settings.json"
 
+CURATE_SCRIPT = BASE_DIR / "0_curate_dataset.py"
 PRECACHE_SCRIPT = BASE_DIR / "1_pre_cache_krea2.py"
 TRAIN_SCRIPT = BASE_DIR / "2_train_lora_krea2.py"
 PROGRESSIVE_SCRIPT = BASE_DIR / "run_progressive.py"
+
+# Curaduría: el informe lo escribe 0_curate_dataset.py y se regenera en cada
+# scan; los ajustes manuales (umbral y reasignaciones) viven aparte para que
+# volver a puntuar no se lleve por delante las decisiones del usuario.
+CURATION_REPORT_NAME = "curation_report.json"
+CURATION_OVERRIDES_NAME = "curation_overrides.json"
 
 # Carpetas contenedoras: todo lo generado se agrupa aquí en vez de en la raíz.
 CACHE_ROOT = "cached_data_local"
@@ -164,6 +172,8 @@ def get_dataset_dir():
 
 
 def get_script_for_name(script_name):
+    if script_name == "curate":
+        return CURATE_SCRIPT
     if script_name == "precache":
         return PRECACHE_SCRIPT
     if script_name == "train":
@@ -175,6 +185,66 @@ def get_script_for_name(script_name):
             return PROGRESSIVE_SCRIPT
         return TRAIN_SCRIPT
     return None
+
+
+def resolve_curation_group(score, threshold, override):
+    """Grupo efectivo de una imagen: "good" o "bad".
+
+    Esta misma lógica está replicada en 2_train_lora_krea2.py; si cambia una,
+    cambia la otra, o la UI enseñaría un reparto distinto del que se entrena.
+
+    Reglas, en orden:
+      1. Una reasignación manual gana siempre.
+      2. Sin cara detectada (score None) -> grupo bueno. No puntuable no es lo
+         mismo que mala: un plano de espalda o un perfil extremo son material
+         legítimo, y penalizarlos por no ser medibles sería un error.
+      3. Sin umbral (dataset demasiado pequeño para estadística) -> grupo bueno.
+      4. score >= umbral -> bueno; por debajo -> bajo.
+    """
+    if override in ("good", "bad"):
+        return override
+    if score is None or threshold is None:
+        return "good"
+    return "good" if score >= threshold else "bad"
+
+
+def load_curation(dataset_dir):
+    """Informe de curaduría + ajustes manuales, ya fusionados.
+
+    Devuelve (meta, por_imagen) donde por_imagen es {stem: {score, group, override}}.
+    Si no se ha curado nunca, meta["available"] es False y por_imagen va vacío.
+    """
+    report = read_json_file(dataset_dir / CURATION_REPORT_NAME, {})
+    overrides = read_json_file(dataset_dir / CURATION_OVERRIDES_NAME, {})
+
+    images = report.get("images") or {}
+    auto_threshold = report.get("auto_threshold")
+    # El umbral manual sólo cuenta si es un número; None significa "usa el auto".
+    manual = overrides.get("threshold")
+    threshold = manual if isinstance(manual, (int, float)) else auto_threshold
+    group_overrides = overrides.get("groups") or {}
+
+    weights = report.get("weights") or {}
+    meta = {
+        "available": bool(images),
+        "generated": report.get("generated"),
+        "baselines": report.get("baselines") or [],
+        "auto_threshold": auto_threshold,
+        "threshold": threshold,
+        "weight_good": float(weights.get("good", 1.0)),
+        "weight_bad": float(weights.get("bad", 0.5)),
+    }
+
+    per_image = {}
+    for stem, entry in images.items():
+        score = (entry or {}).get("score")
+        override = group_overrides.get(stem)
+        per_image[stem] = {
+            "score": score,
+            "override": override if override in ("good", "bad") else None,
+            "group": resolve_curation_group(score, threshold, override),
+        }
+    return meta, per_image
 
 
 def get_status():
@@ -479,12 +549,19 @@ def save_precache():
             train_cfg["output_dir"] = f"./{output_dir_name}"
         if "trigger_word" in data:
             train_cfg["trigger_word"] = data["trigger_word"]
-        # Mantener coherente el modo progresivo: el botón Train lo lee de train_settings.
+        # Mantener coherente el modo de resolución: el botón Train lo lee de
+        # train_settings. Con una sola resolución en la lista, el pre-cache sigue
+        # escribiendo en un subdir <label>/, así que el modo NO puede ser "off"
+        # (el entrenador miraría el directorio padre y lo encontraría vacío):
+        # se usa el preset de resolución constante con ese mismo label.
         res = data.get("resolutions")
         if isinstance(res, list):
-            train_cfg["progressive"] = ("512_768_1024" if len(res) == 3
-                                        else "768_1024" if len(res) == 2
-                                        else "off")
+            if len(res) == 1:
+                train_cfg["progressive"] = str(int(round(math.sqrt(float(res[0])))))
+            else:
+                train_cfg["progressive"] = ("512_768_1024" if len(res) == 3
+                                            else "768_1024" if len(res) == 2
+                                            else "off")
 
         write_json_file(TRAIN_CONFIG, train_cfg)
 
@@ -704,6 +781,9 @@ def serve_preview(filename):
 @app.route("/api/dataset-info", methods=["GET"])
 def dataset_info():
     dataset_dir = get_dataset_dir()
+    # La curaduría se adjunta aquí en vez de en su propio endpoint para que la
+    # vista de dos grupos salga de una sola llamada, con los captions incluidos.
+    curation_meta, curation_images = load_curation(dataset_dir)
     images = []
     if dataset_dir.is_dir():
         for file_path in sorted(dataset_dir.iterdir()):
@@ -715,13 +795,63 @@ def dataset_info():
                         caption = txt_path.read_text(encoding="utf-8").strip()
                     except Exception:
                         pass
-                images.append({"file": file_path.name, "has_txt": txt_path.exists(), "caption": caption})
+                entry = {"file": file_path.name, "has_txt": txt_path.exists(), "caption": caption}
+                cur = curation_images.get(file_path.stem)
+                if cur is not None:
+                    entry.update(score=cur["score"], group=cur["group"], override=cur["override"])
+                else:
+                    # Imagen añadida después del último scan: sin puntuación todavía.
+                    entry.update(score=None, group=None, override=None)
+                images.append(entry)
     return jsonify({
         "path": str(dataset_dir),
         "image_count": len(images),
         "caption_count": sum(1 for img in images if img["has_txt"]),
+        "curation": curation_meta,
         "images": images[:500]
     })
+
+
+@app.route("/api/curation-overrides", methods=["POST"])
+def save_curation_overrides():
+    """Guarda el umbral manual y las reasignaciones de grupo.
+
+    Va a un archivo aparte del informe a propósito: 0_curate_dataset.py regenera
+    curation_report.json en cada scan, y las decisiones del usuario no deben
+    perderse por volver a puntuar.
+    """
+    try:
+        data = request.get_json(force=True) or {}
+        dataset_dir = get_dataset_dir()
+        if not dataset_dir.is_dir():
+            return jsonify({"status": "error", "error": f"Dataset folder not found / Carpeta no encontrada: {dataset_dir}"}), 404
+
+        threshold = data.get("threshold")
+        if threshold is not None and not isinstance(threshold, (int, float)):
+            return jsonify({"status": "error", "error": "threshold must be a number or null / debe ser número o null."}), 400
+
+        # Sólo se persiste lo que difiere del veredicto automático: guardar el
+        # grupo de cada imagen convertiría un cambio de umbral posterior en un
+        # no-op silencioso, porque todo estaría ya fijado a mano.
+        groups = data.get("groups") or {}
+        if not isinstance(groups, dict):
+            return jsonify({"status": "error", "error": "groups must be an object / debe ser un objeto."}), 400
+        clean_groups = {str(k): v for k, v in groups.items() if v in ("good", "bad")}
+
+        payload = {"threshold": threshold, "groups": clean_groups}
+        write_json_file(dataset_dir / CURATION_OVERRIDES_NAME, payload)
+
+        meta, per_image = load_curation(dataset_dir)
+        good = sum(1 for v in per_image.values() if v["group"] == "good")
+        return jsonify({
+            "status": "ok",
+            "file": CURATION_OVERRIDES_NAME,
+            "good_count": good,
+            "bad_count": len(per_image) - good,
+            "override_count": len(clean_groups),
+        })
+    except Exception as exc:
+        return jsonify({"status": "error", "error": str(exc)}), 500
 
 
 @app.route("/api/dataset-image/<path:filename>")

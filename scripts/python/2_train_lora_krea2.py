@@ -153,6 +153,14 @@ DEFAULTS = {
     # ── D3: caption dropout ──────────────────────────────────────────────────
     "caption_dropout_rate": 0.0,
 
+    # ── Curaduría de dataset ─────────────────────────────────────────────────
+    # 0_curate_dataset.py reparte el dataset en dos grupos por identidad facial;
+    # aquí cada grupo entrena con su propio peso. Sin curation_report.json en la
+    # carpeta del dataset esto es un no-op exacto, así que un run sin curar se
+    # comporta igual que antes de existir la opción.
+    "dataset_path": "./dataset",
+    "curation_weights": True,
+
     # ── Progresivo / Multi-fase ───────────────────────────────────────────────
     "run_id": "",
     "phase_index": 0,
@@ -316,6 +324,8 @@ EXPORT_ALPHA_TENSORS = bool(_cfg("export_alpha_tensors"))
 PREVIEW_SOURCE    = str(_cfg("preview_source")).strip().lower()
 PREVIEW_WALK_SEED = bool(_cfg("preview_walk_seed"))
 CAPTION_DROPOUT   = float(_cfg("caption_dropout_rate"))
+DATASET_PATH      = from_root(str(_cfg("dataset_path")).strip())
+CURATION_WEIGHTS  = bool(_cfg("curation_weights"))
 if VAL_CACHE_DIR:
     VAL_CACHE_DIR = from_root(VAL_CACHE_DIR)
 
@@ -421,6 +431,7 @@ def _print_effective_config():
         ("noise_offset",         NOISE_OFFSET),
         ("high_precision_targets", HIGH_PREC_TARGETS),
         ("caption_dropout_rate", CAPTION_DROPOUT),
+        ("curation_weights",     CURATION_WEIGHTS),
         ("use_ema",              f"{USE_EMA} (decay {EMA_DECAY}, {EMA_DEVICE})" if USE_EMA else False),
         ("compact_text",         COMPACT_TEXT),
         ("gradient_checkpointing", GRAD_CHECKPOINTING),
@@ -864,6 +875,96 @@ def rotate_checkpoints(output_dir, keep):
             print(f"  ↳ pruned old checkpoint / checkpoint antiguo eliminado: {os.path.basename(path)}")
         except OSError as exc:
             print(f"  [!] Could not prune {os.path.basename(path)}: {exc}")
+
+
+def _curation_group(score, threshold, override):
+    """Grupo efectivo de una imagen: "good" o "bad".
+
+    Réplica exacta de resolve_curation_group() en scripts/python/server.py. Si
+    cambia una, cambia la otra, o la UI enseñaría un reparto distinto del que se
+    entrena. Sin cara detectada (score None) va al grupo bueno: no puntuable no
+    es lo mismo que mala.
+    """
+    if override in ("good", "bad"):
+        return override
+    if score is None or threshold is None:
+        return "good"
+    return "good" if score >= threshold else "bad"
+
+
+def load_curation_weights(dataset_path, cache_names):
+    """Peso por entrada de caché a partir de la curaduría del dataset.
+
+    Devuelve (pesos, resumen) o (None, None) si no hay nada que aplicar: sin
+    informe, con la opción desactivada o si todos los pesos salen a 1.0 — en
+    esos casos el entrenamiento debe quedar bit a bit como antes de existir esto.
+
+    El informe lo escribe 0_curate_dataset.py y se regenera en cada scan; el
+    umbral efectivo y las reasignaciones manuales viven en curation_overrides.json,
+    propiedad de la UI, y mandan sobre el veredicto automático.
+    """
+    if not CURATION_WEIGHTS:
+        return None, None
+    report_path = os.path.join(dataset_path, "curation_report.json")
+    if not os.path.exists(report_path):
+        return None, None
+    try:
+        with open(report_path, "r", encoding="utf-8") as f:
+            report = json.load(f)
+    except Exception as exc:
+        print(f"[!] curation_report.json ilegible ({exc}) — se entrena sin pesos / training unweighted.")
+        return None, None
+
+    overrides = {}
+    ovr_path = os.path.join(dataset_path, "curation_overrides.json")
+    if os.path.exists(ovr_path):
+        try:
+            with open(ovr_path, "r", encoding="utf-8") as f:
+                overrides = json.load(f) or {}
+        except Exception as exc:
+            print(f"[!] curation_overrides.json ilegible ({exc}) — se usa el umbral automático.")
+
+    images = report.get("images") or {}
+    if not images:
+        return None, None
+    manual = overrides.get("threshold")
+    threshold = manual if isinstance(manual, (int, float)) else report.get("auto_threshold")
+    group_ovr = overrides.get("groups") or {}
+    weights_cfg = report.get("weights") or {}
+    w_good = float(weights_cfg.get("good", 1.0))
+    w_bad = float(weights_cfg.get("bad", 0.5))
+
+    weights, counts, unscored = {}, {"good": 0, "bad": 0}, []
+    for name in cache_names:
+        # Con flip_x el caché guarda `img_001` E `img_001__flip` como entradas
+        # separadas, pero la curaduría puntuó la imagen fuente: sin quitar el
+        # sufijo, la mitad del dataset entrenaría a peso 1.0 en silencio. Mismo
+        # strip que usa el chequeo de huérfanos más abajo.
+        stem = name[:-6] if name.endswith("__flip") else name
+        entry = images.get(stem)
+        if entry is None:
+            # En el caché pero no en el informe: se añadió después del último
+            # scan. Peso completo (nunca penalizar por falta de datos) y aviso.
+            unscored.append(stem)
+            weights[name] = 1.0
+            continue
+        group = _curation_group(entry.get("score"), threshold, group_ovr.get(stem))
+        counts[group] += 1
+        weights[name] = w_good if group == "good" else w_bad
+
+    if unscored:
+        uniq = sorted(set(unscored))
+        print(f"[!] {len(uniq)} imagen(es) del caché no están en curation_report.json "
+              f"(añadidas tras el último scan) — entrenan a peso ×1.0: "
+              + ", ".join(uniq[:8]) + ("…" if len(uniq) > 8 else ""))
+        print("    Vuelve a curar el dataset para incluirlas / re-run curation to include them.")
+
+    if all(abs(w - 1.0) < 1e-9 for w in weights.values()):
+        return None, None
+
+    summary = {"good": counts["good"], "bad": counts["bad"],
+               "w_good": w_good, "w_bad": w_bad, "threshold": threshold}
+    return weights, summary
 
 
 class EpochSampler:
@@ -1511,6 +1612,19 @@ def train_krea2():
         print("[!] ERROR: no training images left after the validation split.")
         sys.exit(1)
 
+    # ── Curaduría: peso por imagen ───────────────────────────────────────────
+    # Se resuelve sobre el set de entrenamiento ya definitivo (post-split), para
+    # que el recuento por grupo refleje lo que de verdad recibe gradiente.
+    curation_w, curation_summary = load_curation_weights(DATASET_PATH, cache_data.keys())
+    if curation_summary:
+        thr = curation_summary["threshold"]
+        print(f"\n[OK] Curaduría activa / curation active — umbral "
+              f"{'auto' if thr is None else f'{thr * 100:.0f}%'}:")
+        print(f"     Buena calificación : {curation_summary['good']:>4} imagen(es) · "
+              f"peso ×{curation_summary['w_good']}")
+        print(f"     Baja calificación  : {curation_summary['bad']:>4} imagen(es) · "
+              f"peso ×{curation_summary['w_bad']}")
+
     neg = None
     if os.path.exists(f"{CACHE_DIR}/_neg_embed.pt"):
         neg_emb = torch.load(f"{CACHE_DIR}/_neg_embed.pt", weights_only=True)
@@ -1750,14 +1864,28 @@ def train_krea2():
                     return_dict=False,
                 )[0]
 
-                if TIMESTEP_WEIGHTING == "none":
+                if TIMESTEP_WEIGHTING == "none" and curation_w is None:
                     raw_loss = F.mse_loss(pred.float(), target.float())
+                    loss_value = raw_loss.detach()
                 else:
                     per_sample = F.mse_loss(pred.float(), target.float(),
                                             reduction="none").mean(dim=(1, 2))
-                    raw_loss = (per_sample * timestep_weight(sigma.float())).mean()
-
-                loss_value = raw_loss.detach()
+                    if TIMESTEP_WEIGHTING != "none":
+                        per_sample = per_sample * timestep_weight(sigma.float())
+                    # El guard de max_loss, el NaN guard y el CSV leen la loss SIN
+                    # el peso de curaduría, por dos motivos: atenuar una imagen la
+                    # volvería inmune al descarte de outliers, y la curva del log
+                    # dejaría de ser comparable con la de un run sin curar.
+                    loss_value = per_sample.mean().detach()
+                    if curation_w is not None:
+                        # Escalar la loss de una muestra ES un LR por imagen. No se
+                        # renormaliza a media 1.0 por batch: eso anularía el efecto,
+                        # y que un batch atenuado aporte menos a la actualización
+                        # acumulada es justamente lo que se busca.
+                        w = torch.tensor([curation_w.get(n, 1.0) for n in names],
+                                         device=per_sample.device, dtype=per_sample.dtype)
+                        per_sample = per_sample * w
+                    raw_loss = per_sample.mean()
             except torch.cuda.OutOfMemoryError:
                 if not OOM_GUARD or on_oom(step, size):
                     raise

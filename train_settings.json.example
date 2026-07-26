@@ -27,7 +27,9 @@
   "trigger_word": "",
   "hf_token": "",
 
+  "_progressive": "Modo de resolución. 'off' = caché plana con target_area. Resolución constante: '512', '768', '1024' (o cualquier número suelto como '640'), que entrenan todos los pasos a esa resolución leyendo el subdir <label>/ de la caché y escribiendo en output_dir/phase0_<label>/. Progresivo multi-fase con hand-off de pesos: '768_1024' o '512_768_1024'. Los modos distintos de 'off' requieren que el Pre-Caché haya generado el subdir correspondiente vía 'resolutions'.",
   "progressive": "off",
+  "phase_portions": [],
   "export_models_dir": "",
-  "export_final_name": "Krea2_Progressive_FINAL.safetensors"
+  "export_final_name": ""
 }

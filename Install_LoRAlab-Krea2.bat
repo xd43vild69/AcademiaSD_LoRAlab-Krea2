@@ -369,6 +369,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
+:: Curaduria del dataset (0_curate_dataset.py): puntuacion de identidad facial
+:: con ArcFace. CPU-only; el modelo (~300 MB) se descarga en el primer uso.
+echo.
+echo Instalando InsightFace para la curaduria del dataset... / Installing InsightFace for dataset curation...
+
+"%VENV_PYTHON%" -m pip install insightface onnxruntime opencv-python
+
+if errorlevel 1 (
+    echo.
+    echo [AVISO] InsightFace no se pudo instalar; la curaduria no estara disponible.
+    echo [WARNING] InsightFace could not be installed; dataset curation will be unavailable.
+    echo El resto del entrenador funciona igualmente. / The rest of the trainer still works.
+)
+
 :: ========================================================
 :: 8/8 - COMPROBACION FINAL / FINAL CHECK
 :: ========================================================
