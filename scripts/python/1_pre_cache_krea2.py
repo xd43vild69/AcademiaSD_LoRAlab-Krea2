@@ -153,10 +153,48 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 
 
 def free_vram(*tensors):
+    """Libera VRAM. Sólo para transiciones de fase, nunca por imagen.
+
+    Ojo con la firma: `del t` borra el nombre local del bucle, no la referencia
+    del llamante, así que pasar tensores aquí no los libera —lo único que hace
+    es el gc + empty_cache. Se llamaba 12 veces por imagen (~18 ms cada una)
+    creyendo que servía para algo, y encima empty_cache destruye el caching
+    allocator y obliga a cudaMalloc de nuevo en la iteración siguiente.
+    """
     for t in tensors:
         del t
     gc.collect()
     torch.cuda.empty_cache()
+
+
+def save_tensor(tensor, path):
+    """torch.save borrando antes el destino.
+
+    El borrado importa desde que se usan hardlinks: sin él, `torch.save` abriría
+    en modo 'wb' el inodo compartido y una escritura a medias corrompería todas
+    las resoluciones a la vez, en vez de sólo ésta.
+    """
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+    torch.save(tensor, path)
+
+
+def link_or_copy(source, dest, tensor):
+    """Enlaza `dest` a `source` (mismo contenido) o, si no se puede, lo escribe.
+
+    El fallback cubre Windows sin privilegios, FAT y cachés repartidas entre
+    discos distintos; en esos casos se vuelve al comportamiento de siempre.
+    """
+    try:
+        os.remove(dest)
+    except FileNotFoundError:
+        pass
+    try:
+        os.link(source, dest)
+    except OSError:
+        torch.save(tensor, dest)
 
 
 def bucket_size(w: int, h: int, area=None):
@@ -361,7 +399,10 @@ def preprocess_krea2():
         z = pipe.vae.encode(img_tensor).latent_dist.sample().float()
         latent = (z - latents_mean) / latents_std
         latent = latent[:, :, 0].to(torch.bfloat16).cpu()
-        free_vram(img_tensor, z)
+        # Sin free_vram aquí: no liberaba nada (img_tensor y z siguen vivos en
+        # este frame hasta el return) y costaba ~18 ms por llamada. Al salir de
+        # la función el refcount los suelta y el caching allocator reutiliza los
+        # bloques, que es justo lo que empty_cache impedía.
         return bw, bh, latent
 
     manifests = {out_dir: ({} if FORCE_RECACHE else load_manifest(out_dir))
@@ -456,14 +497,33 @@ def preprocess_krea2():
                 variants.append(("__flip", img.transpose(Image.FLIP_LEFT_RIGHT)))
 
             sizes = []
+            # embeds_cpu y mask_cpu se calculan una vez por imagen y no dependen
+            # de la resolución: el mismo fichero se escribía idéntico en cada
+            # subdir (~7.6 MB por imagen y resolución). Se escribe una vez y las
+            # demás resoluciones se enlazan al mismo inodo. El trainer no se
+            # entera: torch.load abre un hardlink igual que cualquier fichero.
+            #
+            # La clave incluye el sufijo a propósito, aunque el tensor de la
+            # variante __flip sea el mismo objeto: torch.save incrusta el nombre
+            # del fichero como prefijo dentro del zip ('an_12_embed/data.pkl'),
+            # así que enlazar entre nombres distintos daría el mismo tensor pero
+            # NO los mismos bytes que escribía el código anterior. Enlazando sólo
+            # entre resoluciones —donde el nombre base coincide— la caché queda
+            # byte a byte igual que antes.
+            first_written = {}
             for out_dir, area in pending:
                 for suffix, variant in variants:
                     bw, bh, latent = vae_latent(variant, area)
                     name = f"{nombre_base}{suffix}"
-                    torch.save(latent,     os.path.join(out_dir, f"{name}_latent.pt"))
-                    torch.save(embeds_cpu, os.path.join(out_dir, f"{name}_embed.pt"))
-                    torch.save(mask_cpu,   os.path.join(out_dir, f"{name}_mask.pt"))
-                    free_vram(latent)
+                    save_tensor(latent, os.path.join(out_dir, f"{name}_latent.pt"))
+                    for kind, tensor in (("embed", embeds_cpu), ("mask", mask_cpu)):
+                        dest = os.path.join(out_dir, f"{name}_{kind}.pt")
+                        source = first_written.get((suffix, kind))
+                        if source is None:
+                            save_tensor(tensor, dest)
+                            first_written[(suffix, kind)] = dest
+                        else:
+                            link_or_copy(source, dest, tensor)
                 sizes.append(f"{bw}x{bh}")
 
             for out_dir, _ in targets:
