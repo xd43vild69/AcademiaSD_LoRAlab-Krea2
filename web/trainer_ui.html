@@ -506,8 +506,6 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
             gap: var(--s3);
-            max-height: 46vh;
-            overflow-y: auto;
             padding: var(--s1);
         }
 
@@ -979,7 +977,7 @@
             <section class="step" id="step-curation">
                 <div class="step-head">
                     <div>
-                        <h2>Curation <span class="info-icon">ⓘ</span><span class="tooltip-box">Splits the dataset into two quality groups by similarity. It runs before pre-caching, and each group receives its own loss weight during training: nothing is deleted or moved; low-scoring images continue training with attenuated weights.</span></h2>
+                        <h2>Curation <span class="info-icon">ⓘ</span><span class="tooltip-box">Splits the dataset into two quality groups by similarity (face, clothes, body-type, tattoo). Select with ★ the <strong>3 baseline images</strong> that best represent your target look and click Score. Three images are used and averaged to prevent single-photo bias in angle, expression, and lighting.</span></h2>
                     </div>
                 </div>
 
@@ -1008,11 +1006,6 @@
                         <button type="button" class="btn btn-sm" onclick="resetThreshold()"
                             title="Reset to automatically calculated threshold">Auto</button>
                         <button type="button" class="btn btn-sm" onclick="saveCurationOverrides()">Save groups</button>
-                    </div>
-                    <div class="cur-hint" id="cur-hint">
-                        Select with ★ the <strong>3 baseline images</strong> that best represent your target look and
-                        click Score. Three images are used and averaged to prevent single-photo bias in
-                        angle, expression, and lighting.
                     </div>
                 </div>
             </section>
@@ -1362,10 +1355,24 @@
         var TERMINAL_MAX_LINES = 500;
 
         let allDatasetImages = [];
+        let currentFilteredImages = [];
         let currentEditingFilename = '';
         let browserPath = '';
         let currentBrowserTarget = 'dataset';
         let currentLoadTarget = 'precache';
+
+        let curationMeta = { available: false, weight_good: 1.0, weight_bad: 0.5 };
+        let curationThreshold = null;     // null = usar el automático del informe
+        let curationGroupOverrides = {};  // stem -> "good" | "bad"
+        let curationBaselines = [];       // stems, exactamente 3 para poder puntuar
+        let baselinesByMode = {
+            'face': [],
+            'clothes': [],
+            'body-type': [],
+            'tattoo': []
+        };
+        let dsGridMode = 'normal';
+        let dsGridHidden = false;
 
         // ─────────────── Step Navigation ───────────────
         // Las secciones se OCULTAN, nunca se desmontan: el resto del código
@@ -1388,6 +1395,7 @@
 
             document.querySelector('.content').scrollTop = 0;
             try { sessionStorage.setItem('step', name); } catch (e) { /* modo privado */ }
+            filterDatasetGrid();
         }
 
         function toggleStatusbar(force) {
@@ -1952,18 +1960,6 @@
         // El servidor entrega el informe y los ajustes ya fusionados; aquí sólo
         // se replica la resolución de grupo para que mover el slider repueble los
         // dos grupos al instante, sin ida y vuelta al servidor.
-        let curationMeta = { available: false, weight_good: 1.0, weight_bad: 0.5 };
-        let curationThreshold = null;     // null = usar el automático del informe
-        let curationGroupOverrides = {};  // stem -> "good" | "bad"
-        let curationBaselines = [];       // stems, exactamente 3 para poder puntuar
-        let baselinesByMode = {
-            'face': [],
-            'clothes': [],
-            'body-type': [],
-            'tattoo': []
-        };
-        let dsGridMode = 'normal';
-        let dsGridHidden = false;
 
         function stemOf(file) {
             const i = file.lastIndexOf('.');
@@ -2215,13 +2211,14 @@
                 + (dsGridHidden ? ' hidden' : '');
         }
 
-        let currentFilteredImages = [];
-
         function renderDatasetGrid(images) {
             const host = document.getElementById('ds-groups');
             host.innerHTML = '';
 
-            if (!curationMeta.available) {
+            const activeStep = document.querySelector('.step-btn.active')?.dataset?.step;
+
+            // En la pestaña Dataset o sin informe de curaduría disponible, se muestra la cuadrícula completa sin separación de grupos.
+            if (!curationMeta.available || activeStep === 'dataset') {
                 currentFilteredImages = images.slice();
                 const grid = document.createElement('div');
                 grid.className = gridClass();
