@@ -209,24 +209,13 @@ def get_script_for_name(script_name):
     return None
 
 
-def resolve_curation_group(score, threshold, override):
-    """Grupo efectivo de una imagen: "good" o "bad".
-
-    Esta misma lógica está replicada en 2_train_lora_krea2.py; si cambia una,
-    cambia la otra, o la UI enseñaría un reparto distinto del que se entrena.
-
-    Reglas, en orden:
-      1. Una reasignación manual gana siempre.
-      2. Sin cara detectada (score None) -> grupo bueno. No puntuable no es lo
-         mismo que mala: un plano de espalda o un perfil extremo son material
-         legítimo, y penalizarlos por no ser medibles sería un error.
-      3. Sin umbral (dataset demasiado pequeño para estadística) -> grupo bueno.
-      4. score >= umbral -> bueno; por debajo -> bajo.
-    """
+def resolve_curation_group(score, threshold, override, mode="face"):
+    """Grupo efectivo de una imagen: "good" o "bad"."""
     if override in ("good", "bad"):
         return override
+    default_group = "good" if mode == "face" else "bad"
     if score is None or threshold is None:
-        return "good"
+        return default_group
     return "good" if score >= threshold else "bad"
 
 
@@ -247,9 +236,11 @@ def load_curation(dataset_dir):
     group_overrides = overrides.get("groups") or {}
 
     weights = report.get("weights") or {}
+    mode = report.get("mode") or "face"
     meta = {
         "available": bool(images),
         "generated": report.get("generated"),
+        "mode": mode,
         "baselines": report.get("baselines") or [],
         "auto_threshold": auto_threshold,
         "threshold": threshold,
@@ -264,7 +255,7 @@ def load_curation(dataset_dir):
         per_image[stem] = {
             "score": score,
             "override": override if override in ("good", "bad") else None,
-            "group": resolve_curation_group(score, threshold, override),
+            "group": resolve_curation_group(score, threshold, override, mode=mode),
         }
     return meta, per_image
 

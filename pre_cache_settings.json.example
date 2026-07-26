@@ -18,5 +18,12 @@
 
   "flip_x": false,
 
+  "curation": {
+    "mode": "face",
+    "baselines": [],
+    "weight_good": 1.0,
+    "weight_bad": 0.5
+  },
+
   "sample_prompts": []
 }

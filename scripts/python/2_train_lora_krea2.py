@@ -877,18 +877,16 @@ def rotate_checkpoints(output_dir, keep):
             print(f"  [!] Could not prune {os.path.basename(path)}: {exc}")
 
 
-def _curation_group(score, threshold, override):
+def _curation_group(score, threshold, override, mode="face"):
     """Grupo efectivo de una imagen: "good" o "bad".
 
-    Réplica exacta de resolve_curation_group() en scripts/python/server.py. Si
-    cambia una, cambia la otra, o la UI enseñaría un reparto distinto del que se
-    entrena. Sin cara detectada (score None) va al grupo bueno: no puntuable no
-    es lo mismo que mala.
+    Réplica exacta de resolve_curation_group() en scripts/python/server.py.
     """
     if override in ("good", "bad"):
         return override
+    default_group = "good" if mode == "face" else "bad"
     if score is None or threshold is None:
-        return "good"
+        return default_group
     return "good" if score >= threshold else "bad"
 
 
@@ -931,6 +929,7 @@ def load_curation_weights(dataset_path, cache_names):
     threshold = manual if isinstance(manual, (int, float)) else report.get("auto_threshold")
     group_ovr = overrides.get("groups") or {}
     weights_cfg = report.get("weights") or {}
+    mode = report.get("mode") or "face"
     w_good = float(weights_cfg.get("good", 1.0))
     w_bad = float(weights_cfg.get("bad", 0.5))
 
@@ -948,7 +947,7 @@ def load_curation_weights(dataset_path, cache_names):
             unscored.append(stem)
             weights[name] = 1.0
             continue
-        group = _curation_group(entry.get("score"), threshold, group_ovr.get(stem))
+        group = _curation_group(entry.get("score"), threshold, group_ovr.get(stem), mode=mode)
         counts[group] += 1
         weights[name] = w_good if group == "good" else w_bad
 

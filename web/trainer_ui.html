@@ -930,13 +930,22 @@
                 <div class="step-head">
                     <div>
                         <h2>Curation</h2>
-                        <p>Splits the dataset into two groups by facial identity. It runs before
+                        <p>Splits the dataset into two quality groups by similarity. It runs before
                             pre-caching, and each group receives its own loss weight during training:
                             nothing is deleted or moved; low-scoring images continue training with attenuated weights.</p>
                     </div>
                 </div>
 
                 <div class="panel">
+                    <div class="form-group" style="max-width: 340px; margin-bottom: var(--s3);">
+                        <label>Curation Criterion</label>
+                        <select id="curation_mode" onchange="syncCurationMode(this.value)">
+                            <option value="face" selected>Face (ArcFace Identity Matching)</option>
+                            <option value="clothes">Clothes (Outfit & Style Matching)</option>
+                            <option value="body-type">Body-Type (Body Shape & Pose)</option>
+                            <option value="tattoo">Tattoo (Ink & Tattoo Matching)</option>
+                        </select>
+                    </div>
                     <div class="cur-row">
                         <span class="cur-chip" id="cur-base-0">baseline 1</span>
                         <span class="cur-chip" id="cur-base-1">baseline 2</span>
@@ -1957,7 +1966,15 @@
             } catch (e) { }
         }
 
+        function syncCurationMode(val) {
+            if (!val) return;
+            curationMeta.mode = val;
+        }
+
         function syncCurationPanel() {
+            if (curationMeta.mode && document.getElementById('curation_mode')) {
+                document.getElementById('curation_mode').value = curationMeta.mode;
+            }
             for (let i = 0; i < 3; i++) {
                 const chip = document.getElementById(`cur-base-${i}`);
                 const name = curationBaselines[i];
@@ -2043,14 +2060,14 @@
                     'expresión e iluminación en la nota de todas las demás.');
                 return;
             }
-            // Se persisten en pre_cache_settings.json: el servidor hace merge, así
-            // que el resto de la configuración no se toca.
+            const mode = document.getElementById('curation_mode')?.value || 'face';
             await fetch('/api/save-precache', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     dataset_path: document.getElementById('dataset_path').value,
                     curation: {
+                        mode: mode,
                         baselines: curationBaselines,
                         weight_good: curationMeta.weight_good,
                         weight_bad: curationMeta.weight_bad
