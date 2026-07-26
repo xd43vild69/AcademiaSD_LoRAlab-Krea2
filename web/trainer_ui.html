@@ -11,1174 +11,947 @@
     <link rel="shortcut icon" type="image/png" href="/assets/logo.png">
 
     <style>
+        /* ==========================================================
+           Sistema visual. Una sola escala: un acento (índigo) sobre
+           neutros slate. El color semántico (--ok/--warn/--err) se
+           reserva para SEÑALES DE ESTADO — nunca para identificar un
+           botón. Antes había 44 colores sueltos y 6 variantes de botón
+           por color; ahora hay un único relleno de acento por pantalla.
+           ========================================================== */
         :root {
-            --bg-dark: #0f172a;
-            --panel-bg: #1e293b;
-            --panel-border: #334155;
+            /* superficies */
+            --bg: #0b1020;
+            --surface: #141a2e;
+            --surface-2: #1b2338;
+            --surface-3: #222c45;
+            --border: #2a3550;
+            --border-strong: #3a4767;
+
+            /* texto */
+            --text: #e8ecf6;
+            --text-dim: #93a0bd;
+            --text-faint: #64708f;
+
+            /* acento único */
             --accent: #6366f1;
-            --accent-hover: #4f46e5;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
+            --accent-hover: #5457e5;
+            --accent-soft: rgba(99, 102, 241, .14);
+
+            /* estado: sólo señales, jamás identidad de botón */
+            --ok: #10b981;
+            --warn: #f59e0b;
+            --err: #ef4444;
+
+            /* escala de espaciado */
+            --s1: 4px;
+            --s2: 8px;
+            --s3: 12px;
+            --s4: 16px;
+            --s5: 24px;
+            --s6: 32px;
+
+            /* radios: control, superficie, pill */
+            --r1: 6px;
+            --r2: 10px;
+            --r9: 999px;
+
+            /* tipografía */
+            --fs-xs: 0.72rem;
+            --fs-sm: 0.82rem;
+            --fs-md: 0.92rem;
+            --fs-lg: 1.05rem;
+            --fs-xl: 1.35rem;
+
+            --mono: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
+            font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: var(--fs-md);
+            line-height: 1.5;
+            /* Shell a pantalla completa: la página no scrollea; scrollean el
+               stepper y el contenido por separado, y la consola queda fija. */
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        header {
-            display: flex;
-            flex-direction: column;
-            background: var(--panel-bg);
-            padding: 18px 25px;
-            border-radius: 12px;
-            border: 1px solid var(--panel-border);
-            margin-bottom: 20px;
-            gap: 15px;
-        }
-
-        /* Banner Superior Panorámico */
-        .banner-container {
-            width: 100%;
-            max-height: 140px;
             overflow: hidden;
-            border-radius: 8px;
+        }
+
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: var(--r9); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+        :focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* ================= Shell ================= */
+
+        .app {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 232px 1fr;
+            min-height: 0;
+        }
+
+        /* ================= Stepper ================= */
+
+        .stepper {
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            padding: var(--s4) var(--s3);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: var(--s1);
+        }
+
+        .brand {
+            padding: var(--s2) var(--s3) var(--s5);
+        }
+
+        .brand h1 {
+            font-size: var(--fs-lg);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .brand span {
+            font-size: var(--fs-xs);
+            color: var(--text-faint);
+        }
+
+        .step-btn {
             display: flex;
             align-items: center;
-            justify-content: center;
-            background: #020617;
-            border: 1px solid var(--panel-border);
-        }
-
-        .banner-img {
+            gap: var(--s3);
             width: 100%;
-            height: 100%;
-            max-height: 140px;
-            object-fit: contain;
-            display: block;
+            padding: var(--s2) var(--s3);
+            background: none;
+            border: none;
+            border-radius: var(--r1);
+            color: var(--text-dim);
+            font: inherit;
+            font-size: var(--fs-sm);
+            text-align: left;
+            cursor: pointer;
+            transition: background .12s, color .12s;
         }
 
-        .header-content {
+        .step-btn:hover { background: var(--surface-2); color: var(--text); }
+
+        .step-btn.active {
+            background: var(--accent-soft);
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .step-num {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            display: grid;
+            place-items: center;
+            border-radius: var(--r9);
+            border: 1px solid var(--border-strong);
+            font-size: var(--fs-xs);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .step-btn.active .step-num {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .step-text { display: flex; flex-direction: column; min-width: 0; }
+        .step-kind { font-size: var(--fs-xs); color: var(--text-faint); font-weight: 400; }
+
+        /* ================= Contenido ================= */
+
+        .content {
+            min-width: 0;
+            overflow-y: auto;
+            padding: var(--s5) var(--s6);
+        }
+
+        .step { display: none; }
+        .step.active { display: block; }
+
+        .step-head {
+            margin-bottom: var(--s5);
+            padding-bottom: var(--s3);
+            border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 20px;
+            gap: var(--s3);
             flex-wrap: wrap;
-            width: 100%;
         }
 
-        .logo-title {
+        .step-head h2 {
+            font-size: var(--fs-xl);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .step-head p {
+            font-size: var(--fs-sm);
+            color: var(--text-dim);
+            margin-top: 2px;
+            max-width: 68ch;
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--r2);
+            padding: var(--s5);
+            margin-bottom: var(--s4);
+        }
+
+        .panel-title {
+            font-size: var(--fs-md);
+            font-weight: 600;
+            margin-bottom: var(--s4);
+            padding-bottom: var(--s2);
+            border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
-            gap: 15px;
-        }
-
-        .logo-title h1 {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #fff;
-            letter-spacing: -0.5px;
-        }
-
-        .logo-title span {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            display: block;
-        }
-
-        /* Social Links */
-        .social-links {
-            display: flex;
-            gap: 8px;
+            justify-content: space-between;
+            gap: var(--s3);
             flex-wrap: wrap;
         }
 
-        .social-btn {
+        .actions {
+            display: flex;
+            gap: var(--s2);
+            flex-wrap: wrap;
+            margin-top: var(--s4);
+        }
+
+        /* ================= Formularios ================= */
+
+        .form-group { margin-bottom: var(--s4); }
+
+        .form-group:last-child { margin-bottom: 0; }
+
+        label {
+            display: block;
+            font-size: var(--fs-sm);
+            color: var(--text-dim);
+            margin-bottom: var(--s1);
+        }
+
+        input[type=text], input[type=number], select, textarea {
+            width: 100%;
+            padding: var(--s2) var(--s3);
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--r1);
+            color: var(--text);
+            font: inherit;
+            font-size: var(--fs-sm);
+            transition: border-color .12s;
+        }
+
+        input:hover, select:hover, textarea:hover { border-color: var(--border-strong); }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
+        }
+
+        input[readonly] {
+            background: var(--surface-2);
+            color: var(--text-faint);
+            border-style: dashed;
+            cursor: default;
+        }
+
+        textarea { resize: vertical; min-height: 90px; font-family: var(--mono); }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--s3);
+        }
+
+        .form-row .form-group { margin-bottom: var(--s4); }
+
+        small { font-size: var(--fs-xs); color: var(--text-faint); }
+
+        .hint { font-size: var(--fs-xs); color: var(--text-faint); margin-top: var(--s1); }
+
+        /* ================= Botones =================
+           Una sola familia. El relleno de acento marca LA acción principal
+           de cada pantalla; todo lo demás es neutro. Lo destructivo se
+           distingue por el texto, no gritando en rojo. */
+
+        .btn {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 0.8rem;
+            justify-content: center;
+            gap: var(--s2);
+            padding: var(--s2) var(--s3);
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--r1);
+            color: var(--text);
+            font: inherit;
+            font-size: var(--fs-sm);
             font-weight: 600;
-            text-decoration: none;
-            color: #fff;
-            background: #0f172a;
-            border: 1px solid var(--panel-border);
-            transition: background 0.2s, border-color 0.2s;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background .12s, border-color .12s, color .12s;
         }
 
-        .social-btn:hover {
+        .btn:hover:not(:disabled) { background: var(--surface-3); border-color: var(--border-strong); }
+
+        .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+        /* Alias: lo genera el selector de unidades del explorador (JS). */
+        .btn-secondary { }
+
+        .btn-primary {
+            background: var(--accent);
             border-color: var(--accent);
-            background: #1a2332;
+            color: #fff;
         }
 
-        .btn-yt {
-            color: #ff0000;
+        .btn-primary:hover:not(:disabled) {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
         }
 
-        .btn-x {
-            color: #f8fafc;
+        .btn-danger { color: var(--err); }
+
+        .btn-danger:hover:not(:disabled) { border-color: var(--err); }
+
+        .btn-ghost { background: none; border-color: transparent; color: var(--text-dim); }
+
+        .btn-ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+
+        .btn-sm { padding: var(--s1) var(--s2); font-size: var(--fs-xs); }
+
+        .btn-full { width: 100%; }
+
+        /* ================= Barra inferior =================
+           Persistente en todos los pasos: plegada muestra estado y
+           hardware; desplegada, la consola. */
+
+        .statusbar {
+            flex-shrink: 0;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
         }
 
-        .btn-discord {
-            color: #5865f2;
-        }
-
-        .btn-kofi {
-            color: #ff5e5b;
-        }
-
-        /* Hardware Monitor Cards (RAM, VRAM, GPU Temp) */
-        .hardware-monitor {
+        .sb-head {
             display: flex;
-            gap: 12px;
+            align-items: center;
+            gap: var(--s4);
+            padding: var(--s2) var(--s4);
+            cursor: pointer;
+            user-select: none;
         }
 
-        .hw-card {
-            background: #0f172a;
-            padding: 10px 14px;
-            border-radius: 8px;
-            border: 1px solid var(--panel-border);
-            min-width: 140px;
+        .sb-head:hover { background: var(--surface-2); }
+
+        .sb-caret {
+            color: var(--text-faint);
+            font-size: var(--fs-xs);
+            transition: transform .15s;
         }
 
-        .hw-card .label {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            font-weight: 600;
-            text-transform: uppercase;
-        }
+        .statusbar.open .sb-caret { transform: rotate(180deg); }
 
-        .hw-card .value {
-            font-size: 0.95rem;
-            font-weight: bold;
-            margin: 3px 0;
-            color: #38bdf8;
-        }
+        .sb-spacer { flex: 1; }
+
+        .sb-metrics { display: flex; gap: var(--s4); flex-wrap: wrap; }
+
+        .metric { display: flex; align-items: center; gap: var(--s2); font-size: var(--fs-xs); }
+
+        .metric .label { color: var(--text-faint); }
+
+        .metric .value { color: var(--text-dim); font-variant-numeric: tabular-nums; }
 
         .progress-bar-bg {
-            width: 100%;
-            height: 6px;
-            background: #334155;
-            border-radius: 3px;
+            width: 54px;
+            height: 4px;
+            background: var(--surface-3);
+            border-radius: var(--r9);
             overflow: hidden;
         }
 
         .progress-bar-fill {
             height: 100%;
-            background: var(--accent);
             width: 0%;
-            transition: width 0.5s ease, background-color 0.5s ease;
+            background: var(--accent);
+            border-radius: var(--r9);
+            transition: width .5s ease;
         }
 
-        .main-grid {
-            display: grid;
-            grid-template-columns: 440px 1fr;
-            gap: 20px;
-            flex: 1;
-        }
+        .sb-body { display: none; border-top: 1px solid var(--border); }
 
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
+        .statusbar.open .sb-body { display: block; }
 
-        .panel {
-            background: var(--panel-bg);
-            border-radius: 12px;
-            border: 1px solid var(--panel-border);
-            padding: 20px;
-        }
-
-        .panel-title {
-            font-size: 1.05rem;
-            font-weight: 600;
-            margin-bottom: 15px;
-            color: #f1f5f9;
-            border-bottom: 1px solid var(--panel-border);
-            padding-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .form-group {
-            margin-bottom: 12px;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-            font-weight: 500;
-        }
-
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            background: #0f172a;
-            border: 1px solid var(--panel-border);
-            color: #fff;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            outline: none;
-        }
-
-        .form-group input[readonly] {
-            background: #1a2332;
-            color: #94a3b8;
-            cursor: not-allowed;
-            border-style: dashed;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus {
-            border-color: var(--accent);
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .btn {
-            padding: 9px 14px;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            font-size: 0.88rem;
-            transition: background 0.2s, transform 0.1s;
+        .status-badge {
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            gap: 6px;
-            text-decoration: none;
+            gap: var(--s2);
+            font-size: var(--fs-xs);
+            font-weight: 600;
+            color: var(--text-dim);
         }
 
-        .btn-full {
-            width: 100%;
+        .status-badge::before {
+            content: '';
+            width: 7px;
+            height: 7px;
+            border-radius: var(--r9);
+            background: var(--text-faint);
         }
 
-        .btn-primary {
-            background: var(--accent);
-            color: white;
-        }
+        /* Reposo: coincide con el estado base, pero se declara explícitamente
+           porque setRunningState() asigna la clase por nombre. */
+        .badge-idle { color: var(--text-dim); }
 
-        .btn-primary:hover {
-            background: var(--accent-hover);
-        }
+        .badge-idle::before { background: var(--text-faint); }
 
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
+        .badge-running { color: var(--text); }
 
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .btn-secondary {
-            background: #334155;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #475569;
-        }
-
-        .btn-warning {
-            background: var(--warning);
-            color: black;
-        }
-
-        .btn-sm {
-            padding: 4px 10px;
-            font-size: 0.75rem;
-            width: auto;
-        }
-
-        .btn-row {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 10px !important;
-            width: 100% !important;
-            box-sizing: border-box !important;
-        }
-
-        .btn-tall {
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            justify-content: center !important;
-            padding: 8px 6px !important;
-            line-height: 1.25 !important;
-            text-align: center !important;
-            min-height: 50px !important;
-            width: 100% !important;
-            box-sizing: border-box !important;
-        }
-
-        .btn-tall .main-text {
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: inherit;
-        }
-
-        .btn-tall .sub-text {
-            font-size: 0.72rem;
-            font-weight: 500;
-            opacity: 0.85;
-            margin-top: 2px;
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .console-container {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
+        .badge-running::before { background: var(--ok); box-shadow: 0 0 0 3px rgba(16, 185, 129, .18); }
 
         .terminal {
-            background: #020617;
-            border-radius: 8px;
-            border: 1px solid var(--panel-border);
-            padding: 15px;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 0.85rem;
-            color: #38bdf8;
+            height: 300px;
             overflow-y: auto;
+            padding: var(--s3) var(--s4);
+            background: var(--bg);
+            font-family: var(--mono);
+            font-size: var(--fs-sm);
+            line-height: 1.45;
             white-space: pre-wrap;
             word-break: break-all;
-            height: 320px;
+            color: var(--text-dim);
         }
 
-        .terminal-line {
-            margin-bottom: 2px;
-            line-height: 1.4;
-        }
+        .terminal-line { min-height: 1.45em; }
 
-        .ds-toolbar {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 12px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
+        /* ================= Inspector de dataset ================= */
 
-        .ds-search {
-            flex: 1;
-            min-width: 150px;
-            background: #0f172a;
-            border: 1px solid var(--panel-border);
-            color: #fff;
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 0.8rem;
-        }
+        .ds-toolbar { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; }
+
+        .ds-search { width: 190px; }
 
         .ds-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 12px;
-            max-height: 380px;
+            gap: var(--s3);
+            max-height: 46vh;
             overflow-y: auto;
-            padding-right: 5px;
+            padding: var(--s1);
         }
 
-        .ds-grid.compact {
-            grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
-        }
-
-        .ds-grid.large {
-            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-        }
-
-        .ds-grid.hidden {
-            display: none;
-        }
+        .ds-grid.compact { grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); }
+        .ds-grid.large { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+        .ds-grid.hidden { display: none; }
 
         .ds-card {
-            background: #0f172a;
-            border: 1px solid var(--panel-border);
-            border-radius: 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--r2);
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
             cursor: pointer;
-            transition: transform 0.15s, border-color 0.15s;
+            transition: border-color .12s, transform .12s;
         }
 
-        .ds-card:hover {
-            transform: translateY(-2px);
-            border-color: var(--accent);
-        }
+        .ds-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+        .ds-card.grp-good { border-color: rgba(16, 185, 129, .5); }
+        .ds-card.grp-bad { border-color: rgba(245, 158, 11, .5); }
 
         .img-wrapper {
             position: relative;
-            width: 100%;
             height: 115px;
-            background: #020617;
+            background: var(--bg);
+            overflow: hidden;
         }
 
-        .ds-grid.compact .img-wrapper {
-            height: 75px;
-        }
+        .ds-grid.compact .img-wrapper { height: 75px; }
+        .ds-grid.large .img-wrapper { height: 165px; }
 
-        .ds-grid.large .img-wrapper {
-            height: 165px;
-        }
-
-        .img-wrapper img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
+        .img-wrapper img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
         .caption-dot {
             position: absolute;
-            top: 6px;
-            right: 6px;
-            width: 11px;
-            height: 11px;
-            border-radius: 50%;
-            border: 1.5px solid #0f172a;
-            box-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
-            z-index: 2;
+            top: var(--s2);
+            left: var(--s2);
+            width: 9px;
+            height: 9px;
+            border-radius: var(--r9);
+            border: 2px solid var(--bg);
         }
 
-        .dot-green {
-            background-color: var(--success);
-        }
-
-        .dot-red {
-            background-color: var(--danger);
-        }
+        .dot-green { background: var(--ok); }
+        .dot-red { background: var(--err); }
 
         .img-filename-tag {
             position: absolute;
             bottom: 0;
             left: 0;
             right: 0;
-            background: rgba(15, 23, 42, 0.85);
+            padding: var(--s1) var(--s2);
+            background: rgba(11, 16, 32, .85);
             backdrop-filter: blur(2px);
-            padding: 3px 6px;
-            font-size: 0.68rem;
-            color: #f8fafc;
-            font-weight: 600;
+            font-size: var(--fs-xs);
+            color: var(--text-dim);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .ds-card .caption {
-            padding: 6px;
-            font-size: 0.72rem;
-            color: var(--text-muted);
+            padding: var(--s2);
+            font-size: var(--fs-xs);
+            color: var(--text-faint);
             height: 40px;
             overflow: hidden;
-            text-overflow: ellipsis;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
-            line-height: 1.2;
-            background: #0f172a;
-        }
-
-        /* ── Curaduría: dos grupos ─────────────────────────────────────────── */
-
-        .cur-panel {
-            background: #0f172a;
-            border: 1px solid var(--panel-border);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 14px;
-        }
-
-        .cur-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .cur-row + .cur-row {
-            margin-top: 10px;
-        }
-
-        .cur-chip {
-            background: #1e293b;
-            border: 1px solid var(--panel-border);
-            border-radius: 999px;
-            padding: 3px 10px;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        .cur-chip.set {
-            border-color: #f1c40f;
-            color: #f1c40f;
-        }
-
-        .cur-slider {
-            flex: 1;
-            min-width: 160px;
-            accent-color: var(--accent);
-        }
-
-        .cur-hint {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-top: 8px;
-            line-height: 1.45;
-        }
-
-        .ds-group-head {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin: 14px 0 8px;
-            padding: 6px 10px;
-            border-radius: 6px;
-            border-left: 4px solid var(--panel-border);
-            background: #0f172a;
-        }
-
-        .ds-group-head.good {
-            border-left-color: var(--success);
-            color: var(--success);
-        }
-
-        .ds-group-head.bad {
-            border-left-color: var(--warning);
-            color: var(--warning);
-        }
-
-        .ds-group-head .weight-tag {
-            font-weight: 500;
-            color: var(--text-muted);
-        }
-
-        .ds-card.grp-good {
-            border-color: rgba(16, 185, 129, 0.55);
-        }
-
-        .ds-card.grp-bad {
-            border-color: rgba(245, 158, 11, 0.55);
-        }
-
-        .score-badge {
-            position: absolute;
-            top: 6px;
-            left: 6px;
-            padding: 1px 6px;
-            border-radius: 999px;
-            font-size: 0.68rem;
-            font-weight: 700;
-            background: rgba(15, 23, 42, 0.88);
-            border: 1px solid currentColor;
-            z-index: 2;
-        }
-
-        .score-badge.good {
-            color: #34d399;
-        }
-
-        .score-badge.bad {
-            color: #fbbf24;
-        }
-
-        /* Sin cara detectada: no puntuable no es lo mismo que mala, así que se
-           marca en gris neutro y se queda en el grupo bueno. */
-        .score-badge.noface {
-            color: #94a3b8;
-        }
-
-        .ovr-badge {
-            position: absolute;
-            bottom: 22px;
-            left: 6px;
-            font-size: 0.62rem;
-            font-weight: 700;
-            color: #c4b5fd;
-            background: rgba(15, 23, 42, 0.88);
-            border: 1px solid currentColor;
-            border-radius: 999px;
-            padding: 1px 6px;
-            z-index: 2;
+            line-height: 1.25;
         }
 
         .card-btn {
             position: absolute;
-            top: 4px;
+            top: var(--s2);
             width: 20px;
             height: 20px;
-            line-height: 18px;
-            text-align: center;
-            border-radius: 5px;
-            font-size: 0.72rem;
-            background: rgba(15, 23, 42, 0.85);
-            border: 1px solid var(--panel-border);
-            color: var(--text-muted);
-            cursor: pointer;
-            z-index: 3;
+            display: grid;
+            place-items: center;
+            border-radius: var(--r1);
+            background: rgba(11, 16, 32, .85);
+            color: var(--text-dim);
+            font-size: var(--fs-xs);
             opacity: 0;
-            transition: opacity 0.12s;
+            transition: opacity .12s, color .12s;
         }
 
-        .ds-card:hover .card-btn {
-            opacity: 1;
+        .ds-card:hover .card-btn { opacity: 1; }
+
+        .card-btn:hover { color: var(--text); }
+
+        .star { right: 28px; }
+        .star.on { opacity: 1; color: var(--warn); }
+        .edit { right: var(--s2); }
+
+        .score-badge {
+            position: absolute;
+            bottom: 22px;
+            right: var(--s2);
+            padding: 1px var(--s2);
+            border-radius: var(--r9);
+            background: rgba(11, 16, 32, .88);
+            border: 1px solid currentColor;
+            font-size: var(--fs-xs);
+            font-weight: 600;
         }
 
-        .card-btn:hover {
-            border-color: var(--accent);
-            color: #f8fafc;
+        .score-badge.good { color: var(--ok); }
+        .score-badge.bad { color: var(--warn); }
+        .score-badge.noface { color: var(--text-faint); }
+
+        .ovr-badge {
+            position: absolute;
+            bottom: 22px;
+            left: var(--s2);
+            padding: 1px var(--s2);
+            border-radius: var(--r9);
+            background: rgba(11, 16, 32, .88);
+            border: 1px solid currentColor;
+            font-size: var(--fs-xs);
+            color: var(--accent);
         }
 
-        .card-btn.star {
-            right: 26px;
+        .ds-group-head {
+            display: flex;
+            align-items: center;
+            gap: var(--s2);
+            margin: var(--s4) 0 var(--s2);
+            padding-left: var(--s2);
+            border-left: 3px solid var(--border-strong);
+            font-size: var(--fs-sm);
+            font-weight: 600;
         }
 
-        /* Un baseline elegido se ve siempre, no sólo al pasar por encima. */
-        .card-btn.star.on {
-            opacity: 1;
-            color: #f1c40f;
-            border-color: #f1c40f;
-        }
+        .ds-group-head.good { border-left-color: var(--ok); }
+        .ds-group-head.bad { border-left-color: var(--warn); }
 
-        .card-btn.edit {
-            right: 4px;
+        .ds-group-head .weight-tag {
+            font-size: var(--fs-xs);
+            font-weight: 400;
+            color: var(--text-faint);
         }
 
         .ds-empty {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-style: italic;
-            padding: 10px 4px;
+            padding: var(--s5);
+            text-align: center;
+            font-size: var(--fs-sm);
+            color: var(--text-faint);
         }
+
+        /* ================= Curaduría ================= */
+
+        .cur-row {
+            display: flex;
+            align-items: center;
+            gap: var(--s2);
+            flex-wrap: wrap;
+            margin-bottom: var(--s3);
+        }
+
+        .cur-chip {
+            padding: var(--s1) var(--s3);
+            border-radius: var(--r9);
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            font-size: var(--fs-xs);
+            color: var(--text-faint);
+        }
+
+        .cur-chip.set { color: var(--warn); border-color: var(--warn); }
+
+        .cur-slider { flex: 1; min-width: 140px; accent-color: var(--accent); padding: 0; }
+
+        .cur-hint {
+            font-size: var(--fs-xs);
+            color: var(--text-faint);
+            line-height: 1.5;
+            max-width: 78ch;
+        }
+
+        /* ================= Galería ================= */
 
         .gallery {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-            gap: 10px;
-            max-height: 200px;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: var(--s3);
+            max-height: 52vh;
             overflow-y: auto;
+            padding: var(--s1);
         }
 
         .preview-card {
             position: relative;
-            border-radius: 6px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--r2);
             overflow: hidden;
-            border: 1px solid var(--panel-border);
             cursor: pointer;
-            background: #0f172a;
-            transition: transform 0.15s, border-color 0.15s;
+            transition: border-color .12s, transform .12s;
         }
 
-        .preview-card:hover {
-            transform: translateY(-2px);
-            border-color: #38bdf8;
-        }
+        .preview-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 
-        .preview-card img {
-            width: 100%;
-            height: 110px;
-            object-fit: cover;
-            display: block;
-        }
+        .preview-card img { width: 100%; height: 130px; object-fit: cover; display: block; }
 
         .preview-filename-tag {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(2px);
-            padding: 3px 6px;
-            font-size: 0.68rem;
-            color: #38bdf8;
-            font-weight: 600;
+            padding: var(--s1) var(--s2);
+            font-size: var(--fs-xs);
+            color: var(--text-dim);
             text-align: center;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
-        .status-badge {
-            font-size: 0.75rem;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .badge-idle {
-            background: #334155;
-            color: #cbd5e1;
-        }
-
-        .badge-running {
-            background: var(--success);
-            color: #fff;
-        }
+        /* ================= Modales ================= */
 
         .modal {
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
+            background: rgba(4, 7, 16, .8);
+            backdrop-filter: blur(3px);
+            z-index: 100;
+            padding: var(--s5);
+            overflow-y: auto;
         }
 
-        .modal.active {
-            display: flex;
-        }
+        .modal.active { display: flex; align-items: center; justify-content: center; }
 
         .modal-content {
-            background: var(--panel-bg);
-            border-radius: 12px;
-            border: 1px solid var(--panel-border);
-            max-width: 800px;
-            width: 100%;
-            padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: var(--s4);
+            width: 100%;
+            max-width: 760px;
             max-height: 90vh;
+            overflow-y: auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--r2);
+            padding: var(--s5);
         }
+
+        .modal-content h3 { font-size: var(--fs-lg); font-weight: 600; }
 
         .modal-content img {
-            max-height: 55vh;
-            object-fit: contain;
-            border-radius: 8px;
-        }
-
-        .modal-content textarea {
             width: 100%;
-            height: 90px;
-            background: #0f172a;
-            border: 1px solid var(--panel-border);
-            color: #fff;
-            padding: 10px;
-            border-radius: 6px;
-            resize: none;
-            font-size: 0.9rem;
+            max-height: 46vh;
+            object-fit: contain;
+            border-radius: var(--r1);
+            background: var(--bg);
         }
 
-        .drive-selector {
+        .modal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+
+        .check-group {
             display: flex;
-            gap: 6px;
-            margin-bottom: 8px;
-            flex-wrap: wrap;
+            flex-direction: column;
+            gap: var(--s2);
+            padding: var(--s3);
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--r1);
         }
+
+        .check-group label {
+            display: flex;
+            align-items: center;
+            gap: var(--s2);
+            margin: 0;
+            font-size: var(--fs-sm);
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .check-group input { width: auto; }
+
+        .info-box {
+            padding: var(--s3);
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--r1);
+            font-size: var(--fs-sm);
+            color: var(--text-dim);
+        }
+
+        .drive-selector { display: flex; gap: var(--s2); flex-wrap: wrap; }
 
         .dir-list {
-            max-height: 250px;
+            max-height: 280px;
             overflow-y: auto;
-            background: #0f172a;
-            border: 1px solid var(--panel-border);
-            border-radius: 6px;
-            padding: 8px;
-            margin-top: 6px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--r1);
         }
 
         .dir-item {
-            padding: 6px 10px;
-            border-radius: 4px;
+            padding: var(--s2) var(--s3);
+            font-size: var(--fs-sm);
+            color: var(--text-dim);
             cursor: pointer;
-            font-size: 0.85rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            border-bottom: 1px solid var(--border);
         }
 
-        .dir-item:hover {
-            background: #1e293b;
-            color: var(--accent);
+        .dir-item:last-child { border-bottom: none; }
+
+        .dir-item:hover { background: var(--surface-2); color: var(--accent); }
+
+        /* ================= Responsive ================= */
+
+        @media (max-width: 1100px) {
+            .app { grid-template-columns: 64px 1fr; }
+            .brand h1, .brand span, .step-text { display: none; }
+            .step-btn { justify-content: center; padding: var(--s2); }
+            .content { padding: var(--s4); }
+        }
+
+        @media (max-width: 780px) {
+            body { height: auto; overflow: visible; }
+            .app { grid-template-columns: 1fr; }
+            .stepper {
+                flex-direction: row;
+                overflow-x: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+                padding: var(--s2);
+            }
+            .brand { display: none; }
+            .form-row { grid-template-columns: 1fr; }
+            .ds-search { width: 100%; }
+            .statusbar { position: sticky; bottom: 0; }
         }
     </style>
 </head>
 
 <body>
 
-    <!-- Selector Oculto para Cargar Ficheros JSON -->
+    <!-- Selector oculto para cargar JSON. triggerLoadJson() lo pulsa por
+         código, así que debe existir siempre, fuera de cualquier paso. -->
     <input type="file" id="json_file_input" accept=".json" style="display:none;" onchange="handleJsonFileLoad(event)">
 
-    <header>
-        <!-- Banner de la cabecera -->
-        <div class="banner-container">
+    <div class="app">
 
-        </div>
-
-        <div class="header-content">
-            <div class="logo-title">
-                <div>
-                    <h1>AcademiaSD</h1>
-                    <span>Web GUI & Automation / Interfaz Web y Automatización</span>
-                </div>
+        <!-- ===================== Navegación por proceso =====================
+             Los pasos siguen el orden real del pipeline. Todas las secciones
+             viven en el DOM desde el parseo y sólo se ocultan con CSS: el JS
+             accede a los controles por getElementById sin comprobar null, así
+             que desmontarlas rompería el guardado en silencio. -->
+        <nav class="stepper">
+            <div class="brand">
+                <h1>AcademiaSD</h1>
+                <span>Krea 2 LoRAlab</span>
             </div>
 
-            <!-- Redes Sociales / Social Links -->
-            <div class="social-links">
+            <button type="button" class="step-btn active" data-step="project" onclick="showStep('project')">
+                <span class="step-num">1</span>
+                <span class="step-text">Proyecto<span class="step-kind">configuración</span></span>
+            </button>
+            <button type="button" class="step-btn" data-step="dataset" onclick="showStep('dataset')">
+                <span class="step-num">2</span>
+                <span class="step-text">Dataset<span class="step-kind">validación</span></span>
+            </button>
+            <button type="button" class="step-btn" data-step="curation" onclick="showStep('curation')">
+                <span class="step-num">3</span>
+                <span class="step-text">Curaduría<span class="step-kind">validación</span></span>
+            </button>
+            <button type="button" class="step-btn" data-step="precache" onclick="showStep('precache')">
+                <span class="step-num">4</span>
+                <span class="step-text">Pre-caché<span class="step-kind">configuración</span></span>
+            </button>
+            <button type="button" class="step-btn" data-step="train" onclick="showStep('train')">
+                <span class="step-num">5</span>
+                <span class="step-text">Entrenar<span class="step-kind">configuración</span></span>
+            </button>
+            <button type="button" class="step-btn" data-step="samples" onclick="showStep('samples')">
+                <span class="step-num">6</span>
+                <span class="step-text">Muestras<span class="step-kind">validación</span></span>
+            </button>
+            <button type="button" class="step-btn" data-step="export" onclick="showStep('export')">
+                <span class="step-num">7</span>
+                <span class="step-text">Exportar<span class="step-kind">configuración</span></span>
+            </button>
+        </nav>
 
-            </div>
+        <main class="content">
 
-            <!-- Hardware Monitor (RAM, VRAM, GPU Temp) -->
-            <div class="hardware-monitor">
-                <div class="hw-card">
-                    <div class="label">RAM Usage / Uso RAM</div>
-                    <div class="value" id="ram-text">-- GB</div>
-                    <div class="progress-bar-bg">
-                        <div class="progress-bar-fill" id="ram-bar"></div>
+            <!-- ===================== 1. Proyecto ===================== -->
+            <section class="step active" id="step-project">
+                <div class="step-head">
+                    <div>
+                        <h2>Proyecto</h2>
+                        <p>El nombre del proyecto deriva las rutas de caché y salida, y la palabra
+                            clave se usa al añadirla a los captions del dataset.</p>
                     </div>
                 </div>
-                <div class="hw-card">
-                    <div class="label">VRAM Usage / Uso VRAM</div>
-                    <div class="value" id="vram-text">-- GB</div>
-                    <div class="progress-bar-bg">
-                        <div class="progress-bar-fill" id="vram-bar" style="background:#38bdf8;"></div>
+
+                <div class="panel">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Project Name / Proyecto</label>
+                            <input type="text" id="project_name" value="" placeholder="Ej: cherry2"
+                                oninput="updateProjectPaths()">
+                        </div>
+                        <div class="form-group">
+                            <label>Trigger Word / Palabra Clave</label>
+                            <input type="text" id="trigger_word" value="">
+                        </div>
                     </div>
-                </div>
-                <div class="hw-card">
-                    <div class="label">GPU Temp / Temp. GPU</div>
-                    <div class="value" id="gpu-temp-text">-- °C</div>
-                    <div class="progress-bar-bg">
-                        <div class="progress-bar-fill" id="gpu-temp-bar" style="background:var(--success);"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </header>
 
-    <div class="main-grid">
-        <!-- Sidebar: Settings -->
-        <div class="sidebar">
-
-            <!-- 1. Pre-Cache Settings Panel -->
-            <div class="panel">
-                <div class="panel-title">1. Pre-Cache Settings / Config. Pre-Caché</div>
-
-                <div class="form-row">
                     <div class="form-group">
-                        <label>Project Name / Proyecto:</label>
-                        <input type="text" id="project_name" value="" placeholder="Ej: cherry2"
-                            oninput="updateProjectPaths()">
+                        <label>Dataset Path / Ruta del Dataset</label>
+                        <div style="display:flex; gap:var(--s2);">
+                            <input type="text" id="dataset_path" value="./dataset" onchange="loadDatasetInfo()">
+                            <button type="button" class="btn" onclick="browseFolderNative('dataset')">Explorar</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Trigger Word / Palabra Clave:</label>
-                        <input type="text" id="trigger_word" value="">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Cache Folder / Carpeta Caché (auto)</label>
+                            <input type="text" id="precache_cache_dir" value="./cached_data_local/default" readonly
+                                title="Ruta informativa generada automáticamente">
+                        </div>
+                        <div class="form-group">
+                            <label>Output Dir / Carpeta Salida (auto)</label>
+                            <input type="text" id="train_output_dir" value="./output_local/default" readonly
+                                title="Ruta informativa generada automáticamente">
+                        </div>
                     </div>
-                </div>
 
-                <div class="form-group">
-                    <label>Dataset Path / Ruta del Dataset:</label>
-                    <div style="display:flex; gap:8px;">
-                        <input type="text" id="dataset_path" value="./dataset" onchange="loadDatasetInfo()">
-                        <button type="button" class="btn btn-secondary btn-sm"
-                            onclick="browseFolderNative('dataset')">Browse / Explorar</button>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Cache Folder / Carpeta Caché (Auto):</label>
-                    <input type="text" id="precache_cache_dir" value="./cached_data_local/default" readonly
-                        title="Ruta informativa generada automáticamente">
-                </div>
-
-                <div class="form-group">
-                    <label>Resolution Mode / Modo de Resolución:</label>
-                    <select id="progressive_mode" onchange="syncProgressive(this.value)">
-                        <option value="off" selected>Off / Clásico (caché plana, resolución libre abajo)</option>
-                        <option value="512">512² constante</option>
-                        <option value="768">768² constante</option>
-                        <option value="1024">1024² constante</option>
-                        <option value="768_1024">768² → 1024² (2 fases)</option>
-                        <option value="512_768_1024">512² → 768² → 1024² (3 fases)</option>
-                    </select>
-                    <small id="progressive_hint" style="display:block;margin-top:4px;opacity:.75"></small>
-                </div>
-
-                <div class="form-group" id="single_res_group">
-                    <label>Resolution / Resolución (px²):</label>
-                    <select id="target_area_select" onchange="syncResolution(this.value)">
-                        <option value="262144">512 x 512 (262,144 px²)</option>
-                        <option value="589824" selected>768 x 768 (589,824 px²)</option>
-                        <option value="1048576">1024 x 1024 (1,048,576 px²)</option>
-                        <option value="custom">Custom / Personalizada</option>
-                    </select>
-                    <input type="number" id="precache_target_area" value="589824" style="margin-top:6px; display:none;">
-                    <div id="vram_hint" style="margin-top:6px; font-size:0.75rem; color:var(--text-muted);"></div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Multiple / Múltiplo:</label>
-                        <select id="precache_multiple">
-                            <option value="16" selected>16</option>
-                            <option value="32">32</option>
-                            <option value="64">64</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Max Side / Lado Máx:</label>
-                        <input type="number" id="precache_max_side" value="1280">
+                    <div class="actions">
+                        <button type="button" class="btn" onclick="triggerLoadJson('precache')">Cargar pre-caché</button>
+                        <button type="button" class="btn" onclick="triggerLoadJson('train')">Cargar entrenamiento</button>
                     </div>
                 </div>
+            </section>
 
-                <div class="form-group">
-                    <label>Max Seq Len / Long. Sec.:</label>
-                    <input type="number" id="precache_max_seq_len" value="128">
-                </div>
-
-                <!-- Botones Load JSON y Save JSON -->
-                <div class="btn-row" style="margin-top:12px;">
-                    <button type="button" class="btn btn-secondary btn-tall" onclick="triggerLoadJson('precache')">
-                        <span class="main-text">Load JSON</span>
-                        <span class="sub-text">Cargar JSON</span>
-                    </button>
-                    <button type="button" class="btn btn-secondary btn-tall" onclick="savePrecacheSettings()">
-                        <span class="main-text">Save JSON</span>
-                        <span class="sub-text">Guardar JSON</span>
-                    </button>
-                </div>
-
-                <button type="button" class="btn btn-primary btn-tall btn-full" id="btn-precache"
-                    onclick="runPrecache()" style="margin-top:8px;">
-                    <span class="main-text">Start Pre-Cache</span>
-                    <span class="sub-text">Iniciar Pre-Caché</span>
-                </button>
-            </div>
-
-            <!-- 2. Training Settings Panel -->
-            <div class="panel">
-                <div class="panel-title">
-                    <span>2. Training Settings / Config. Entrenamiento</span>
-                    <span id="checkpoint-badge" style="font-size:0.75rem; color:#38bdf8;"></span>
-                </div>
-
-                <div class="form-group">
-                    <label>Output Dir / Carpeta Salida (Auto):</label>
-                    <input type="text" id="train_output_dir" value="./output_local/default" readonly
-                        title="Ruta informativa generada automáticamente">
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Total Steps / Pasos Totales:</label>
-                        <input type="number" id="train_total_steps" value="1200">
+            <!-- ===================== 2. Dataset ===================== -->
+            <section class="step" id="step-dataset">
+                <div class="step-head">
+                    <div>
+                        <h2>Dataset</h2>
+                        <p>Revisa imágenes y captions. El punto verde indica que la imagen tiene
+                            su <code>.txt</code>; el rojo, que le falta.</p>
                     </div>
-                    <div class="form-group">
-                        <label>Learning Rate / LR:</label>
-                        <input type="text" id="train_lr" value="0.0001">
-                    </div>
+                    <span class="status-badge"><span id="ds-count">0</span>&nbsp;img ·
+                        <span id="ds-txt-count">0</span>&nbsp;txt</span>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>LoRA Rank (R):</label>
-                        <input type="number" id="train_lora_rank" value="16">
-                    </div>
-                    <div class="form-group">
-                        <label>LoRA Alpha (A):</label>
-                        <input type="number" id="train_lora_alpha" value="32">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Batch Size:</label>
-                        <input type="number" id="train_batch_size" value="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Grad Accum Steps:</label>
-                        <input type="number" id="train_grad_accum" value="4">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>LoRA Target / Capas:</label>
-                        <select id="train_lora_target">
-                            <option value="all" selected>All / Todas (máx. calidad)</option>
-                            <option value="attn+ff">Attn + FF (sin text_fusion)</option>
-                            <option value="attn">Attn only / Sólo atención (mín. VRAM)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Compact Text / Compactar texto:</label>
-                        <select id="train_compact_text">
-                            <option value="true" selected>ON (flash attention, requiere Batch 1)</option>
-                            <option value="false">OFF</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Save Every / Guardar Cada:</label>
-                        <input type="number" id="train_save_every" value="25">
-                    </div>
-                    <div class="form-group">
-                        <label>Seed / Semilla:</label>
-                        <input type="number" id="train_seed" value="42">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Preview Every / Preview Cada:</label>
-                        <input type="number" id="train_preview_every" value="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Caption Mode / Modo Sample:</label>
-                        <select id="train_preview_caption_mode">
-                            <option value="first">First / Primero</option>
-                            <option value="random">Random / Aleatorio</option>
-                            <option value="rotate4">Rotate 4 / Rotar 4</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Botones Load JSON y Save JSON -->
-                <div class="btn-row" style="margin-top:12px;">
-                    <button type="button" class="btn btn-secondary btn-tall" onclick="triggerLoadJson('train')">
-                        <span class="main-text">Load JSON</span>
-                        <span class="sub-text">Cargar JSON</span>
-                    </button>
-                    <button type="button" class="btn btn-secondary btn-tall" onclick="saveTrainSettings()">
-                        <span class="main-text">Save JSON</span>
-                        <span class="sub-text">Guardar JSON</span>
-                    </button>
-                </div>
-
-                <!-- Botones Start/Resume y Stop -->
-                <div class="btn-row" style="margin-top:8px;">
-                    <button type="button" class="btn btn-success btn-tall" id="btn-train" onclick="runTrain()">
-                        <span class="main-text">Start / Resume</span>
-                        <span class="sub-text">Iniciar / Reanudar</span>
-                    </button>
-                    <button type="button" class="btn btn-danger btn-tall" id="btn-stop" onclick="stopScript()" disabled>
-                        <span class="main-text">Stop Training</span>
-                        <span class="sub-text">Detener</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- 3. Export to WebUI Models Panel -->
-            <div class="panel">
-                <div class="panel-title">3. Export to WebUI / Enviar a Models</div>
-
-                <div class="form-group">
-                    <label>Final LoRA Filename / Nombre Final (.safetensors):</label>
-                    <input type="text" id="export_final_name" value="krea2_lora.safetensors"
-                        placeholder="mi_lora_krea2.safetensors">
-                </div>
-
-                <div class="form-group">
-                    <label>UI LoRA Folder / Carpeta models/lora (ComfyUI / Forge / A1111):</label>
-                    <div style="display:flex; gap:8px;">
-                        <input type="text" id="export_models_dir" value="" placeholder="C:/ComfyUI/models/loras">
-                        <button type="button" class="btn btn-secondary btn-sm"
-                            onclick="browseFolderNative('export')">Browse / Explorar</button>
-                    </div>
-                </div>
-
-                <button type="button" class="btn btn-warning btn-tall btn-full" onclick="sendToModels()"
-                    style="margin-top:5px;">
-                    <span class="main-text">🚀 Send to Models</span>
-                    <span class="sub-text">Enviar a Models</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Right Column: Terminal, Dataset Inspector & Previews -->
-        <div class="panel console-container">
-            <div class="panel-title">
-                <span>Console Output / Terminal de Consola</span>
-                <span class="status-badge badge-idle" id="status-badge">IDLE / INACTIVO</span>
-            </div>
-
-            <div class="terminal" id="terminal"></div>
-
-            <!-- Dataset Inspector -->
-            <div>
-                <div class="panel-title">
-                    <span>Dataset Inspector / Inspector (<span id="ds-count">0</span> img, <span
-                            id="ds-txt-count">0</span> txt)</span>
+                <div class="panel">
                     <div class="ds-toolbar">
-                        <input type="text" class="ds-search" id="ds-search" placeholder="Search / Buscar..."
+                        <input type="text" class="ds-search" id="ds-search" placeholder="Buscar..."
                             oninput="filterDatasetGridDebounced()">
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="setGridMode('compact')">Compact
-                            / Pequeño</button>
-                        <button type="button" class="btn btn-secondary btn-sm"
-                            onclick="setGridMode('normal')">Normal</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="setGridMode('large')">Expand /
-                            Grande</button>
-                        <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-ds"
-                            onclick="toggleDatasetGrid()">Hide / Ocultar</button>
-                        <button type="button" class="btn btn-warning btn-sm" onclick="addTriggerToAllCaptions()">+
-                            Trigger All</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="openBatchReplaceModal()"
-                            title="Reemplazar palabra/texto en todo el dataset (F2)">🔍 Reemplazar (F2)</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadDatasetInfo()">Refresh /
-                            Actualizar</button>
+                        <button type="button" class="btn btn-sm" onclick="setGridMode('compact')">Pequeño</button>
+                        <button type="button" class="btn btn-sm" onclick="setGridMode('normal')">Normal</button>
+                        <button type="button" class="btn btn-sm" onclick="setGridMode('large')">Grande</button>
+                        <button type="button" class="btn btn-sm" id="btn-toggle-ds"
+                            onclick="toggleDatasetGrid()">Ocultar</button>
+                        <button type="button" class="btn btn-sm" onclick="addTriggerToAllCaptions()">+ Trigger</button>
+                        <button type="button" class="btn btn-sm" onclick="openBatchReplaceModal()"
+                            title="Reemplazar palabra o texto en todo el dataset (F2)">Reemplazar (F2)</button>
+                        <button type="button" class="btn btn-sm" onclick="loadDatasetInfo()">Actualizar</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===================== 3. Curaduría ===================== -->
+            <section class="step" id="step-curation">
+                <div class="step-head">
+                    <div>
+                        <h2>Curaduría</h2>
+                        <p>Reparte el dataset en dos grupos por identidad facial. Se ejecuta antes
+                            del pre-caché y al entrenar cada grupo lleva su propio peso: nada se
+                            borra ni se mueve, las imágenes de baja nota siguen entrenando atenuadas.</p>
                     </div>
                 </div>
 
-                <!-- Curaduría: reparte el dataset en dos grupos por identidad
-                     facial. Corre ANTES del pre-caché; al entrenar, cada grupo
-                     lleva su propio peso. Nada se borra ni se mueve. -->
-                <div class="cur-panel">
+                <div class="panel">
                     <div class="cur-row">
-                        <strong style="font-size:0.9rem;">🎯 Curaduría / Curation</strong>
                         <span class="cur-chip" id="cur-base-0">baseline 1</span>
                         <span class="cur-chip" id="cur-base-1">baseline 2</span>
                         <span class="cur-chip" id="cur-base-2">baseline 3</span>
-                        <button type="button" class="btn btn-primary btn-sm" id="btn-curate"
-                            onclick="runCurate()">Puntuar / Score</button>
+                        <button type="button" class="btn btn-primary" id="btn-curate"
+                            onclick="runCurate()">Puntuar</button>
                     </div>
                     <div class="cur-row" id="cur-threshold-row" style="display:none;">
-                        <span style="font-size:0.78rem; color:var(--text-muted); white-space:nowrap;">
-                            Umbral / Threshold</span>
+                        <label style="margin:0; white-space:nowrap;">Umbral</label>
                         <input type="range" class="cur-slider" id="cur-threshold" min="0" max="100" step="1"
                             oninput="onThresholdInput(this.value)">
-                        <span id="cur-threshold-val"
-                            style="font-size:0.8rem; font-weight:700; min-width:38px;">--</span>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="resetThreshold()"
+                        <span id="cur-threshold-val" style="min-width:40px; font-weight:700;">--</span>
+                        <button type="button" class="btn btn-sm" onclick="resetThreshold()"
                             title="Volver al umbral calculado automáticamente">Auto</button>
-                        <button type="button" class="btn btn-success btn-sm" onclick="saveCurationOverrides()">
-                            Guardar grupos</button>
+                        <button type="button" class="btn btn-sm" onclick="saveCurationOverrides()">Guardar grupos</button>
                     </div>
                     <div class="cur-hint" id="cur-hint">
                         Elige con ★ las <strong>3 imágenes</strong> que mejor representan el look que buscas y
@@ -1186,102 +959,340 @@
                         ángulo, expresión e iluminación en la nota de todas las demás.
                     </div>
                 </div>
+            </section>
 
-                <div id="ds-groups"></div>
-            </div>
+            <!-- El grid lo comparten Dataset y Curaduría: es el mismo dato con
+                 distinta lectura. Vive fuera de ambas secciones —entre las dos—
+                 y showStep() lo muestra en cualquiera de los dos pasos, así no
+                 hay que duplicar ids ni mover nodos por JS. -->
+            <div id="ds-groups"></div>
 
-            <!-- Previews -->
-            <div>
-                <div class="panel-title">Generated Step Previews / Previsualizaciones Generadas</div>
-                <div class="gallery" id="gallery"></div>
-            </div>
-        </div>
+            <!-- ===================== 4. Pre-caché ===================== -->
+            <section class="step" id="step-precache">
+                <div class="step-head">
+                    <div>
+                        <h2>Pre-caché</h2>
+                        <p>Calcula latentes y embeddings una sola vez para reutilizarlos en todos
+                            los entrenamientos sobre este dataset.</p>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="form-group">
+                        <label>Resolution Mode / Modo de Resolución</label>
+                        <select id="progressive_mode" onchange="syncProgressive(this.value)">
+                            <option value="off" selected>Off / Clásico (caché plana, resolución libre abajo)</option>
+                            <option value="512">512² constante</option>
+                            <option value="768">768² constante</option>
+                            <option value="1024">1024² constante</option>
+                            <option value="768_1024">768² → 1024² (2 fases)</option>
+                            <option value="512_768_1024">512² → 768² → 1024² (3 fases)</option>
+                        </select>
+                        <small id="progressive_hint" class="hint"></small>
+                    </div>
+
+                    <div class="form-group" id="single_res_group">
+                        <label>Resolution / Resolución (px²)</label>
+                        <select id="target_area_select" onchange="syncResolution(this.value)">
+                            <option value="262144">512 × 512 (262 144 px²)</option>
+                            <option value="589824" selected>768 × 768 (589 824 px²)</option>
+                            <option value="1048576">1024 × 1024 (1 048 576 px²)</option>
+                            <option value="custom">Custom / Personalizada</option>
+                        </select>
+                        <input type="number" id="precache_target_area" value="589824"
+                            style="margin-top:var(--s2); display:none;">
+                        <div id="vram_hint" class="hint"></div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Multiple / Múltiplo</label>
+                            <select id="precache_multiple">
+                                <option value="16" selected>16</option>
+                                <option value="32">32</option>
+                                <option value="64">64</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Max Side / Lado Máx</label>
+                            <input type="number" id="precache_max_side" value="1280">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Max Seq Len / Long. Secuencia</label>
+                        <input type="number" id="precache_max_seq_len" value="128">
+                    </div>
+
+                    <div class="actions">
+                        <button type="button" class="btn btn-primary" id="btn-precache"
+                            onclick="runPrecache()">Iniciar pre-caché</button>
+                        <button type="button" class="btn" onclick="savePrecacheSettings()">Guardar ajustes</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===================== 5. Entrenar ===================== -->
+            <section class="step" id="step-train">
+                <div class="step-head">
+                    <div>
+                        <h2>Entrenar</h2>
+                        <p>Requiere el pre-caché hecho. Si hay un checkpoint, «Iniciar» reanuda
+                            desde el último paso guardado.</p>
+                    </div>
+                    <span class="status-badge" id="checkpoint-badge"></span>
+                </div>
+
+                <div class="panel">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Total Steps / Pasos Totales</label>
+                            <input type="number" id="train_total_steps" value="1200">
+                        </div>
+                        <div class="form-group">
+                            <label>Learning Rate</label>
+                            <input type="text" id="train_lr" value="0.0001">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>LoRA Rank (R)</label>
+                            <input type="number" id="train_lora_rank" value="16">
+                        </div>
+                        <div class="form-group">
+                            <label>LoRA Alpha (A)</label>
+                            <input type="number" id="train_lora_alpha" value="32">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Batch Size</label>
+                            <input type="number" id="train_batch_size" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Grad Accum Steps</label>
+                            <input type="number" id="train_grad_accum" value="4">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>LoRA Target / Capas</label>
+                            <select id="train_lora_target">
+                                <option value="all" selected>All / Todas (máx. calidad)</option>
+                                <option value="attn+ff">Attn + FF (sin text_fusion)</option>
+                                <option value="attn">Attn only / Sólo atención (mín. VRAM)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Compact Text / Compactar texto</label>
+                            <select id="train_compact_text">
+                                <option value="true" selected>ON (flash attention, requiere Batch 1)</option>
+                                <option value="false">OFF</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Save Every / Guardar Cada</label>
+                            <input type="number" id="train_save_every" value="25">
+                        </div>
+                        <div class="form-group">
+                            <label>Seed / Semilla</label>
+                            <input type="number" id="train_seed" value="42">
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button type="button" class="btn btn-primary" id="btn-train"
+                            onclick="runTrain()">Iniciar / Reanudar</button>
+                        <button type="button" class="btn btn-danger" id="btn-stop" onclick="stopScript()"
+                            disabled>Detener</button>
+                        <button type="button" class="btn" onclick="saveTrainSettings()">Guardar ajustes</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===================== 6. Muestras ===================== -->
+            <section class="step" id="step-samples">
+                <div class="step-head">
+                    <div>
+                        <h2>Muestras</h2>
+                        <p>Previsualizaciones generadas durante el entrenamiento. Con «cada 0 pasos»
+                            no se genera ninguna.</p>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Preview Every / Preview Cada (pasos)</label>
+                            <input type="number" id="train_preview_every" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Caption Mode / Modo Sample</label>
+                            <select id="train_preview_caption_mode">
+                                <option value="first">First / Primero</option>
+                                <option value="random">Random / Aleatorio</option>
+                                <option value="rotate4">Rotate 4 / Rotar 4</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Previsualizaciones generadas</div>
+                    <div class="gallery" id="gallery"></div>
+                </div>
+            </section>
+
+            <!-- ===================== 7. Exportar ===================== -->
+            <section class="step" id="step-export">
+                <div class="step-head">
+                    <div>
+                        <h2>Exportar</h2>
+                        <p>Copia el LoRA final —o el checkpoint de paso más alto— a la carpeta de
+                            modelos de ComfyUI, Forge o A1111.</p>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="form-group">
+                        <label>Final LoRA Filename / Nombre Final (.safetensors)</label>
+                        <input type="text" id="export_final_name" value="krea2_lora.safetensors"
+                            placeholder="mi_lora_krea2.safetensors">
+                    </div>
+
+                    <div class="form-group">
+                        <label>UI LoRA Folder / Carpeta models/loras</label>
+                        <div style="display:flex; gap:var(--s2);">
+                            <input type="text" id="export_models_dir" value="" placeholder="C:/ComfyUI/models/loras">
+                            <button type="button" class="btn" onclick="browseFolderNative('export')">Explorar</button>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button type="button" class="btn btn-primary" onclick="sendToModels()">Enviar a models</button>
+                    </div>
+                </div>
+            </section>
+
+        </main>
     </div>
 
-    <!-- Modal: Edit Caption & Inspection -->
+    <!-- ===================== Barra de estado persistente =====================
+         Visible desde cualquier paso: plegada muestra el estado y el hardware;
+         desplegada, la consola. Así se puede configurar el siguiente paso sin
+         perder de vista el log del que está corriendo. -->
+    <footer class="statusbar" id="statusbar">
+        <div class="sb-head" onclick="toggleStatusbar()">
+            <span class="status-badge badge-idle" id="status-badge">Inactivo</span>
+            <span class="sb-spacer"></span>
+            <div class="sb-metrics">
+                <span class="metric">
+                    <span class="label">RAM</span>
+                    <span class="value" id="ram-text">--</span>
+                    <span class="progress-bar-bg"><span class="progress-bar-fill" id="ram-bar"></span></span>
+                </span>
+                <span class="metric">
+                    <span class="label">VRAM</span>
+                    <span class="value" id="vram-text">--</span>
+                    <span class="progress-bar-bg"><span class="progress-bar-fill" id="vram-bar"></span></span>
+                </span>
+                <span class="metric">
+                    <span class="label">GPU</span>
+                    <span class="value" id="gpu-temp-text">--</span>
+                    <span class="progress-bar-bg"><span class="progress-bar-fill" id="gpu-temp-bar"></span></span>
+                </span>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm"
+                onclick="event.stopPropagation(); clearTerminal();">Limpiar</button>
+            <span class="sb-caret">▲</span>
+        </div>
+        <div class="sb-body">
+            <div class="terminal" id="terminal"></div>
+        </div>
+    </footer>
+
+    <!-- Modal: editar caption / inspeccionar imagen -->
     <div class="modal" id="modal" onclick="closeModal(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 id="modal-filename" style="font-size:1rem;">Filename</h3>
-                <span style="font-size:0.8rem; color:var(--text-muted);">Click outside or button to close</span>
+            <div class="modal-head">
+                <h3 id="modal-filename">Filename</h3>
+                <small>Pulsa fuera o Cerrar para salir</small>
             </div>
             <img id="modal-img" src="" alt="Dataset Image">
             <div class="form-group">
-                <label>Caption Text (.txt):</label>
+                <label>Caption (.txt)</label>
                 <textarea id="modal-txt"></textarea>
             </div>
-            <div style="display:flex; gap:10px;">
-                <button type="button" class="btn btn-success btn-full" onclick="saveCurrentCaption()">Save Caption /
-                    Guardar Caption</button>
-                <button type="button" class="btn btn-secondary btn-full" onclick="closeModal()">Close / Cerrar</button>
+            <div class="actions">
+                <button type="button" class="btn btn-primary" onclick="saveCurrentCaption()">Guardar caption</button>
+                <button type="button" class="btn" onclick="closeModal()">Cerrar</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal: Folder Browser Backup -->
+    <!-- Modal: explorador de carpetas (respaldo del selector nativo) -->
     <div class="modal" id="folder-modal" onclick="closeFolderModal(event)">
         <div class="modal-content" onclick="event.stopPropagation()" style="max-width:600px;">
-            <h3>Select Directory / Seleccionar Carpeta</h3>
-            <div style="font-size:0.85rem; color:var(--text-muted);" id="browser-current-path">/</div>
-
+            <h3>Seleccionar carpeta</h3>
+            <small id="browser-current-path">/</small>
             <div class="drive-selector" id="drive-selector"></div>
             <div class="dir-list" id="dir-list"></div>
-
-            <div style="display:flex; gap:10px; margin-top:10px;">
-                <button type="button" class="btn btn-primary btn-full" onclick="confirmFolderSelection()">Use Selected
-                    Folder / Usar Carpeta</button>
-                <button type="button" class="btn btn-secondary btn-full" onclick="closeFolderModal()">Cancel /
-                    Cancelar</button>
+            <div class="actions">
+                <button type="button" class="btn btn-primary" onclick="confirmFolderSelection()">Usar carpeta</button>
+                <button type="button" class="btn" onclick="closeFolderModal()">Cancelar</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal: Batch Replace Word in Captions (F2) -->
+    <!-- Modal: reemplazo masivo en captions (F2) -->
     <div class="modal" id="batch-replace-modal" onclick="closeBatchReplaceModal(event)">
-        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:550px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="font-size:1.1rem; color:var(--accent); display:flex; align-items:center; gap:8px; margin:0;">
-                    🔍 Reemplazar Palabra en Captions <span style="font-size:0.75rem; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; color:#94a3b8;">F2</span>
-                </h3>
-                <span style="font-size:1.2rem; color:var(--text-muted); cursor:pointer; font-weight:bold;" onclick="closeBatchReplaceModal()">✕</span>
-            </div>
-
-            <div class="form-group" style="margin-top:5px;">
-                <label>Palabra / Texto a Buscar:</label>
-                <input type="text" id="replace-search-input" placeholder="Ej: 1girl" oninput="updateReplaceLiveStats()">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:560px;">
+            <div class="modal-head">
+                <h3>Reemplazar palabra en captions</h3>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="closeBatchReplaceModal()">✕</button>
             </div>
 
             <div class="form-group">
-                <label>Reemplazar por:</label>
-                <input type="text" id="replace-target-input" placeholder="Ej: woman (dejar vacío para eliminar)" oninput="updateReplaceLiveStats()">
+                <label>Palabra o texto a buscar</label>
+                <input type="text" id="replace-search-input" placeholder="Ej: 1girl"
+                    oninput="updateReplaceLiveStats()">
             </div>
 
-            <div style="display:flex; flex-direction:column; gap:8px; background:#0f172a; padding:10px 12px; border-radius:6px; border:1px solid var(--panel-border);">
-                <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+            <div class="form-group">
+                <label>Reemplazar por</label>
+                <input type="text" id="replace-target-input" placeholder="Ej: woman (vacío para eliminar)"
+                    oninput="updateReplaceLiveStats()">
+            </div>
+
+            <div class="check-group">
+                <label>
                     <input type="checkbox" id="replace-case-sensitive" checked onchange="updateReplaceLiveStats()">
-                    Sensible a mayúsculas / minúsculas (Case Sensitive)
+                    Sensible a mayúsculas y minúsculas
                 </label>
-                <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                <label>
                     <input type="checkbox" id="replace-whole-word" checked onchange="updateReplaceLiveStats()">
-                    Coincidir solo palabra completa (Whole Word)
+                    Coincidir sólo palabra completa
                 </label>
-                <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                <label>
                     <input type="checkbox" id="replace-clean-commas" checked>
                     Limpiar comas y espacios sobrantes al eliminar
                 </label>
             </div>
 
-            <div id="replace-live-stats" style="background:#0f172a; padding:12px; border-radius:8px; border:1px solid var(--panel-border); font-size:0.88rem; color:var(--text-muted); transition: all 0.2s ease;">
-                Ingresa un texto a buscar para calcular las coincidencias en el dataset.
+            <div class="info-box" id="replace-live-stats">
+                Escribe un texto a buscar para calcular las coincidencias en el dataset.
             </div>
 
-            <div style="display:flex; gap:10px; margin-top:5px;">
-                <button type="button" class="btn btn-warning btn-full" id="btn-execute-replace" onclick="executeBatchReplace()" disabled>
-                    🔄 Reemplazar en Todo el Dataset
-                </button>
-                <button type="button" class="btn btn-secondary btn-full" onclick="closeBatchReplaceModal()">
-                    Cancelar
-                </button>
+            <div class="actions">
+                <button type="button" class="btn btn-primary" id="btn-execute-replace"
+                    onclick="executeBatchReplace()" disabled>Reemplazar en todo el dataset</button>
+                <button type="button" class="btn" onclick="closeBatchReplaceModal()">Cancelar</button>
             </div>
         </div>
     </div>
@@ -1299,6 +1310,43 @@
         let browserPath = '';
         let currentBrowserTarget = 'dataset';
         let currentLoadTarget = 'precache';
+
+        // ─────────────── Navegación por pasos ───────────────
+        // Las secciones se OCULTAN, nunca se desmontan: el resto del código
+        // accede a los controles por getElementById sin comprobar null, y
+        // getElementById sigue encontrando elementos con display:none. Sacar
+        // una sección del DOM rompería el guardado en silencio.
+
+        // Dataset y Curaduría son dos lecturas del mismo grid, así que ambos
+        // muestran el contenedor compartido #ds-groups.
+        const STEPS_WITH_GRID = ['dataset', 'curation'];
+
+        function showStep(name) {
+            document.querySelectorAll('.step').forEach(s =>
+                s.classList.toggle('active', s.id === 'step-' + name));
+            document.querySelectorAll('.step-btn').forEach(b =>
+                b.classList.toggle('active', b.dataset.step === name));
+
+            const grid = document.getElementById('ds-groups');
+            if (grid) grid.style.display = STEPS_WITH_GRID.includes(name) ? '' : 'none';
+
+            document.querySelector('.content').scrollTop = 0;
+            try { sessionStorage.setItem('step', name); } catch (e) { /* modo privado */ }
+        }
+
+        function toggleStatusbar(force) {
+            const bar = document.getElementById('statusbar');
+            const open = force === undefined ? !bar.classList.contains('open') : force;
+            bar.classList.toggle('open', open);
+            if (open) {
+                const term = document.getElementById('terminal');
+                term.scrollTop = term.scrollHeight;
+            }
+        }
+
+        function clearTerminal() {
+            document.getElementById('terminal').innerHTML = '';
+        }
 
         async function updateSystemStats() {
             // Con la pestaña oculta no hay nada que mirar, y cada llamada hace
@@ -1482,6 +1530,15 @@
         syncResolution(document.getElementById('target_area_select').value);
         syncProgressive(document.getElementById('progressive_mode').value);
         loadSettings();
+
+        // Restaurar el paso de la sesión: recargar la página no debe devolverte
+        // al principio del pipeline. También fija la visibilidad inicial del
+        // grid compartido.
+        (function restoreStep() {
+            let saved = null;
+            try { saved = sessionStorage.getItem('step'); } catch (e) { /* modo privado */ }
+            showStep(document.getElementById('step-' + saved) ? saved : 'project');
+        })();
 
         // CARGAR FICHERO JSON
         function triggerLoadJson(target) {
@@ -1825,10 +1882,13 @@
             const badge = document.getElementById('status-badge');
             if (running) {
                 badge.className = 'status-badge badge-running';
-                badge.innerText = 'RUNNING / EN EJECUCIÓN';
+                badge.innerText = 'En ejecución';
+                // Al arrancar algo, desplegar la consola: es lo que el usuario
+                // quiere ver justo entonces, esté en el paso que esté.
+                toggleStatusbar(true);
             } else {
                 badge.className = 'status-badge badge-idle';
-                badge.innerText = 'IDLE / INACTIVO';
+                badge.innerText = 'Inactivo';
             }
         }
 
@@ -2110,14 +2170,14 @@
         function setGridMode(mode) {
             dsGridMode = mode;
             dsGridHidden = false;
-            document.getElementById('btn-toggle-ds').innerText = 'Hide / Ocultar';
+            document.getElementById('btn-toggle-ds').innerText = 'Ocultar';
             filterDatasetGrid();
         }
 
         function toggleDatasetGrid() {
             dsGridHidden = !dsGridHidden;
             document.getElementById('btn-toggle-ds').innerText =
-                dsGridHidden ? 'Show / Mostrar' : 'Hide / Ocultar';
+                dsGridHidden ? 'Mostrar' : 'Ocultar';
             filterDatasetGrid();
         }
 
@@ -2381,6 +2441,9 @@
         document.addEventListener('keydown', function(e) {
             if (e.key === 'F2') {
                 e.preventDefault();
+                // El atajo puede pulsarse desde cualquier paso; el reemplazo
+                // sólo tiene sentido viendo el dataset, así que se navega allí.
+                showStep('dataset');
                 if (dsGridHidden) {
                     toggleDatasetGrid();
                 }
