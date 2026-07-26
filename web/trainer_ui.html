@@ -1225,8 +1225,8 @@
                     <small id="modal-nav-info">Click outside or Close to exit</small>
                 </div>
                 <div style="display:flex; gap:var(--s2); align-items:center;">
-                    <button type="button" class="btn btn-sm" onclick="navigateModalImage(-1)" title="Previous image (Cmd+Shift+[)">◄ Prev</button>
-                    <button type="button" class="btn btn-sm" onclick="navigateModalImage(1)" title="Next image (Cmd+Shift+])">Next ►</button>
+                    <button type="button" class="btn btn-sm" onclick="navigateModalImage(-1)" title="Previous image (Cmd+Shift+<)">◄ Prev</button>
+                    <button type="button" class="btn btn-sm" onclick="navigateModalImage(1)" title="Next image (Cmd+Shift+>)">Next ►</button>
                     <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal()" title="Close (Esc)">✕</button>
                 </div>
             </div>
@@ -2258,7 +2258,7 @@
             const countStr = (idx !== -1 && list.length > 0) ? ` (${idx + 1} of ${list.length})` : '';
             const hint = document.getElementById('modal-nav-info');
             if (hint) {
-                hint.innerText = `Image ${countStr} · Cmd+Shift+] / [ to navigate`;
+                hint.innerText = `Image ${countStr} · Cmd+Shift+> / < to navigate`;
             }
         }
 
@@ -2519,15 +2519,15 @@
             const modal = document.getElementById('modal');
             const isModalActive = modal && modal.classList.contains('active');
 
-            // Keyboard navigation for dataset image modal: Cmd + Shift + ] (Next) / Cmd + Shift + [ (Prev)
+            // Keyboard navigation for dataset image modal: Cmd + Shift + > (Next) / Cmd + Shift + < (Prev)
             const isModifier = e.metaKey || e.ctrlKey;
             if (isModalActive && isModifier && e.shiftKey) {
-                if (e.key === ']' || e.key === '}' || e.code === 'BracketRight') {
+                if (e.key === '>' || e.key === '.' || e.code === 'Period' || e.key === ']' || e.code === 'BracketRight') {
                     e.preventDefault();
                     navigateModalImage(1);
                     return;
                 }
-                if (e.key === '[' || e.key === '{' || e.code === 'BracketLeft') {
+                if (e.key === '<' || e.key === ',' || e.code === 'Comma' || e.key === '[' || e.code === 'BracketLeft') {
                     e.preventDefault();
                     navigateModalImage(-1);
                     return;
