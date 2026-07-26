@@ -4,6 +4,7 @@ server.py — Backend web para AcademiaSD Krea-2 Trainer
 Web backend for AcademiaSD Krea-2 Trainer
 """
 
+import hashlib
 import json
 import math
 import os
@@ -108,6 +109,14 @@ OUTPUT_ROOT = "output_local"
 LOGS_DIR = PROJECT_ROOT / "logs"
 RUN_STATE_FILE = LOGS_DIR / ".run_state.json"
 KEEP_LOGS = 10
+
+# Miniaturas del Dataset Inspector. El grid pinta recuadros de ~115 px, así que
+# servir el original (1-3 MB por imagen) era el mayor coste de toda la app: un
+# re-render movía decenas de MB. Se cachean en disco y se sirven con max_age
+# largo; la invalidación va por la URL, que lleva el mtime del original.
+THUMB_DIR = PROJECT_ROOT / ".thumb_cache"
+THUMB_WIDTHS = (192, 384)          # 1x y 2x del recuadro más grande del grid
+IMAGE_MAX_AGE = 31536000           # 1 año: seguro porque la URL está versionada
 
 app = Flask(__name__)
 
@@ -870,11 +879,16 @@ def get_previews():
     output_dir = get_train_output_dir()
     previews = []
     if output_dir.is_dir():
-        for file_path in output_dir.iterdir():
-            if file_path.is_file() and file_path.name.startswith("preview_step_") and file_path.suffix.lower() == ".png":
-                previews.append(file_path)
-    previews.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return jsonify({"output_dir": str(output_dir), "previews": [p.name for p in previews[:50]]})
+        # scandir da el tipo y el stat de una pasada; el filtro por nombre va
+        # antes de tocar el disco, así que los .safetensors del directorio ya no
+        # se statean (este endpoint se llama cada 8 s).
+        with os.scandir(output_dir) as it:
+            for entry in it:
+                if (entry.name.startswith("preview_step_")
+                        and entry.name.lower().endswith(".png") and entry.is_file()):
+                    previews.append((entry.stat().st_mtime, entry.name))
+    previews.sort(reverse=True)
+    return jsonify({"output_dir": str(output_dir), "previews": [n for _, n in previews[:50]]})
 
 
 @app.route("/api/preview/<path:filename>")
@@ -887,7 +901,9 @@ def serve_preview(filename):
         return "", 403
     if not requested.is_file():
         return "", 404
-    return send_from_directory(str(output_dir), requested.name)
+    # Los previews son inmutables: el nombre lleva el step. La galería los pedía
+    # de nuevo cada 8 s porque Werkzeug fuerza no-cache sin max_age.
+    return send_from_directory(str(output_dir), requested.name, max_age=IMAGE_MAX_AGE)
 
 
 @app.route("/api/dataset-info", methods=["GET"])
@@ -902,12 +918,26 @@ def dataset_info():
             if file_path.is_file() and not file_path.name.startswith(".") and file_path.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"):
                 txt_path = file_path.with_suffix(".txt")
                 caption = ""
-                if txt_path.exists():
-                    try:
-                        caption = txt_path.read_text(encoding="utf-8").strip()
-                    except Exception:
-                        pass
-                entry = {"file": file_path.name, "has_txt": txt_path.exists(), "caption": caption}
+                # Un solo stat: leer el .txt ya nos dice si existe. Antes se
+                # llamaba a exists() dos veces por imagen (2N syscalls por
+                # request, y este endpoint se dispara desde 10 sitios).
+                try:
+                    caption = txt_path.read_text(encoding="utf-8").strip()
+                    has_txt = True
+                except FileNotFoundError:
+                    has_txt = False
+                except Exception:
+                    # El .txt está pero no se puede leer (permisos, encoding):
+                    # existe igualmente, sólo que sin caption utilizable.
+                    has_txt = True
+                try:
+                    mtime = int(file_path.stat().st_mtime)
+                except OSError:
+                    mtime = 0
+                # mtime viaja al cliente para versionar la URL de la imagen: así
+                # se puede servir con max_age largo sin servir nada rancio.
+                entry = {"file": file_path.name, "has_txt": has_txt,
+                         "caption": caption, "mtime": mtime}
                 cur = curation_images.get(file_path.stem)
                 if cur is not None:
                     entry.update(score=cur["score"], group=cur["group"], override=cur["override"])
@@ -966,6 +996,35 @@ def save_curation_overrides():
         return jsonify({"status": "error", "error": str(exc)}), 500
 
 
+def get_thumbnail(src: Path, width: int):
+    """Ruta de la miniatura de `src` a `width` px, generándola si hace falta.
+
+    Devuelve None si Pillow no está o la imagen no se puede procesar: quien
+    llama sirve entonces el original, así que esto nunca deja al grid sin fotos.
+    """
+    try:
+        stat = src.stat()
+        # La clave incluye mtime y tamaño: tocar la imagen invalida la miniatura.
+        key = hashlib.sha1(
+            f"{src.resolve()}|{stat.st_mtime_ns}|{stat.st_size}|{width}".encode()
+        ).hexdigest()
+        thumb = THUMB_DIR / f"{key}.jpg"
+        if thumb.exists():
+            return thumb
+
+        from PIL import Image
+        THUMB_DIR.mkdir(parents=True, exist_ok=True)
+        with Image.open(src) as im:
+            im = im.convert("RGB")
+            im.thumbnail((width, width), Image.LANCZOS)
+            tmp = thumb.with_suffix(".tmp.jpg")
+            im.save(tmp, "JPEG", quality=82, optimize=True)
+            os.replace(tmp, thumb)
+        return thumb
+    except Exception:
+        return None
+
+
 @app.route("/api/dataset-image/<path:filename>")
 def serve_dataset_image(filename):
     dataset_dir = get_dataset_dir()
@@ -976,7 +1035,18 @@ def serve_dataset_image(filename):
         return "", 403
     if not requested.is_file() or requested.suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp"):
         return "", 404
-    return send_from_directory(str(dataset_dir), requested.name)
+
+    # ?w=<px> pide miniatura (grid); sin él se sirve el original (modal/zoom).
+    try:
+        width = int(request.args.get("w", "0"))
+    except ValueError:
+        width = 0
+    if width in THUMB_WIDTHS:
+        thumb = get_thumbnail(requested, width)
+        if thumb is not None:
+            return send_from_directory(str(thumb.parent), thumb.name, max_age=IMAGE_MAX_AGE)
+
+    return send_from_directory(str(dataset_dir), requested.name, max_age=IMAGE_MAX_AGE)
 
 
 @app.route("/api/save-caption", methods=["POST"])

@@ -1138,7 +1138,7 @@
                             id="ds-txt-count">0</span> txt)</span>
                     <div class="ds-toolbar">
                         <input type="text" class="ds-search" id="ds-search" placeholder="Search / Buscar..."
-                            oninput="filterDatasetGrid()">
+                            oninput="filterDatasetGridDebounced()">
                         <button type="button" class="btn btn-secondary btn-sm" onclick="setGridMode('compact')">Compact
                             / Pequeño</button>
                         <button type="button" class="btn btn-secondary btn-sm"
@@ -1287,6 +1287,13 @@
     </div>
 
     <script>
+        // Un entrenamiento largo emitía decenas de miles de <div> sin podar
+        // nunca, y cada línea forzaba un reflow al leer scrollHeight: el coste
+        // crecía con lo ya acumulado (O(n²) sobre la sesión). Se declara aquí
+        // arriba, con el resto de globales, para que appendTerminal nunca pueda
+        // encontrarla en zona muerta temporal.
+        var TERMINAL_MAX_LINES = 500;
+
         let allDatasetImages = [];
         let currentEditingFilename = '';
         let browserPath = '';
@@ -1294,6 +1301,9 @@
         let currentLoadTarget = 'precache';
 
         async function updateSystemStats() {
+            // Con la pestaña oculta no hay nada que mirar, y cada llamada hace
+            // un fork de nvidia-smi en el servidor.
+            if (document.hidden) return;
             try {
                 const res = await fetch('/api/system-stats');
                 const data = await res.json();
@@ -1322,6 +1332,24 @@
         setInterval(updateSystemStats, 3000);
         updateSystemStats();
 
+        // Debouncers. Son declaraciones de función (hoisted) a propósito: se
+        // invocan desde atributos oninput y desde updateProjectPaths, que corre
+        // durante el arranque, antes de que un `const` estuviera inicializado.
+        let _gridFilterTimer = null;
+        function filterDatasetGridDebounced() {
+            // Un re-render reconstruye todas las tarjetas del grid; arrastrar el
+            // slider lo disparaba decenas de veces por segundo.
+            clearTimeout(_gridFilterTimer);
+            _gridFilterTimer = setTimeout(filterDatasetGrid, 120);
+        }
+
+        let _checkpointTimer = null;
+        function checkCheckpointInfoDebounced() {
+            // Antes se hacía un fetch por cada tecla pulsada en project_name.
+            clearTimeout(_checkpointTimer);
+            _checkpointTimer = setTimeout(checkCheckpointInfo, 300);
+        }
+
         function updateProjectPaths() {
             const proj = document.getElementById('project_name').value.trim();
             const cacheDir = `./cached_data_local/${proj || 'default'}`;
@@ -1333,7 +1361,7 @@
             if (proj) {
                 document.getElementById('export_final_name').value = `krea2_lora_${proj}.safetensors`;
             }
-            checkCheckpointInfo();
+            checkCheckpointInfoDebounced();
         }
 
         // VRAM estimada con batch_size 1, LoRA rank 16 y compact_text activo.
@@ -1623,6 +1651,10 @@
 
         function appendTerminal(text, replace = false) {
             const term = document.getElementById('terminal');
+            // Sólo se auto-scrollea si el usuario ya estaba abajo; si ha subido a
+            // leer algo, dejarlo donde está.
+            const atBottom = term.scrollHeight - term.scrollTop - term.clientHeight < 40;
+
             if (replace && term.lastElementChild) {
                 term.lastElementChild.innerText = text;
             } else {
@@ -1630,8 +1662,11 @@
                 div.className = 'terminal-line';
                 div.innerText = text;
                 term.appendChild(div);
+                while (term.childElementCount > TERMINAL_MAX_LINES) {
+                    term.removeChild(term.firstElementChild);
+                }
             }
-            term.scrollTop = term.scrollHeight;
+            if (atBottom) term.scrollTop = term.scrollHeight;
         }
 
         // El proceso corre desacoplado en el servidor y escribe a un log; este
@@ -1876,7 +1911,7 @@
         function onThresholdInput(value) {
             curationThreshold = parseInt(value, 10) / 100;
             document.getElementById('cur-threshold-val').innerText = `${value}%`;
-            filterDatasetGrid();
+            filterDatasetGridDebounced();
         }
 
         function resetThreshold() {
@@ -1959,6 +1994,16 @@
             await loadDatasetInfo();
         }
 
+        // Las URLs de imagen llevan el mtime (?v=): el servidor las sirve con
+        // max_age de un año y el navegador no vuelve a pedirlas en cada
+        // re-render. Cambiar la imagen cambia el mtime y con él la URL.
+        function thumbUrl(img, w) {
+            return `/api/dataset-image/${encodeURIComponent(img.file)}?w=${w}&v=${img.mtime || 0}`;
+        }
+        function fullUrl(img) {
+            return `/api/dataset-image/${encodeURIComponent(img.file)}?v=${img.mtime || 0}`;
+        }
+
         function makeCard(img) {
             const card = document.createElement('div');
             const group = curationMeta.available ? groupOf(img) : null;
@@ -1983,7 +2028,8 @@
 
             card.innerHTML = `
                 <div class="img-wrapper">
-                    <img src="/api/dataset-image/${encodeURIComponent(img.file)}" alt="${safeFile}">
+                    <img src="${thumbUrl(img, 192)}" srcset="${thumbUrl(img, 192)} 1x, ${thumbUrl(img, 384)} 2x"
+                         alt="${safeFile}" loading="lazy" decoding="async">
                     <span class="${dotClass}" title="${dotTitle}"></span>
                     ${scoreBadge}${ovrBadge}
                     <div class="card-btn star${isBase ? ' on' : ''}" title="Usar como baseline">★</div>
@@ -1995,13 +2041,13 @@
             card.querySelector('.star').onclick = (e) => { e.stopPropagation(); toggleBaseline(img.file); };
             card.querySelector('.edit').onclick = (e) => {
                 e.stopPropagation();
-                openModal(`/api/dataset-image/${encodeURIComponent(img.file)}`, img.file, img.caption || '');
+                openModal(fullUrl(img), img.file, img.caption || '');
             };
             // Con curaduría activa el clic reasigna de grupo (la acción principal
             // aquí); sin curar mantiene el comportamiento de siempre.
             card.onclick = curationMeta.available
                 ? () => toggleGroup(img.file)
-                : () => openModal(`/api/dataset-image/${encodeURIComponent(img.file)}`, img.file, img.caption || '');
+                : () => openModal(fullUrl(img), img.file, img.caption || '');
             return card;
         }
 
@@ -2090,10 +2136,19 @@
             }
         }
 
+        let lastPreviewKey = null;
+
         async function loadPreviews() {
+            // Se llama cada 8 s durante horas. Con la pestaña oculta no hay nada
+            // que pintar, y si la lista no ha cambiado no se toca el DOM: antes
+            // se reconstruía la galería entera con <img> nuevos cada tick.
+            if (document.hidden) return;
             try {
                 const res = await fetch('/api/previews');
                 const data = await res.json();
+                const key = data.previews.join('|');
+                if (key === lastPreviewKey) return;
+                lastPreviewKey = key;
                 const gallery = document.getElementById('gallery');
                 gallery.innerHTML = '';
                 data.previews.forEach(filename => {
@@ -2108,7 +2163,7 @@
                     }
 
                     card.innerHTML = `
-                        <img src="/api/preview/${filename}" alt="${filename}">
+                        <img src="/api/preview/${filename}" alt="${filename}" loading="lazy" decoding="async">
                         <div class="preview-filename-tag">${stepTag}</div>
                     `;
                     gallery.appendChild(card);

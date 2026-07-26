@@ -89,3 +89,4 @@ ehthumbs.db
 .idea/
 .claude/
 logs/
+.thumb_cache/
