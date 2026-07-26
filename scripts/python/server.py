@@ -4,6 +4,7 @@ server.py — Backend web para AcademiaSD Krea-2 Trainer
 Web backend for AcademiaSD Krea-2 Trainer
 """
 
+import codecs
 import hashlib
 import json
 import math
@@ -773,6 +774,17 @@ def run_script():
         return jsonify({"status": "error", "error": str(exc)}), 500
 
 
+# Separa conservando el terminador: split devuelve [texto, sep, texto, sep, …,
+# resto], que es justo lo que hace falta para saber si la línea la cerró un
+# '\r' (reescribir en sitio) o un '\n' (línea nueva).
+LINE_SPLIT_RE = re.compile(r"([\r\n])")
+
+
+def sse_output(text, replace, offset):
+    payload = {"type": "output", "text": text, "replace": replace, "offset": offset}
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
 @app.route("/api/stream", methods=["GET"])
 def stream_log():
     """Tail SSE de un log de run. Reengancha sin tocar el proceso.
@@ -801,6 +813,7 @@ def stream_log():
         yield f"data: {json.dumps({'type': 'start', 'log': log_name, 'offset': pos}, ensure_ascii=False)}\n\n"
 
         buffer = ""
+        decoder = codecs.getincrementaldecoder("utf-8")("replace")
         try:
             while True:
                 chunk = b""
@@ -813,17 +826,22 @@ def stream_log():
 
                 if chunk:
                     pos += len(chunk)
-                    for char in chunk.decode("utf-8", errors="replace"):
-                        if char == "\r":
-                            if buffer:
-                                yield f"data: {json.dumps({'type': 'output', 'text': buffer, 'replace': True, 'offset': pos}, ensure_ascii=False)}\n\n"
-                                buffer = ""
-                        elif char == "\n":
-                            if buffer:
-                                yield f"data: {json.dumps({'type': 'output', 'text': buffer, 'replace': False, 'offset': pos}, ensure_ascii=False)}\n\n"
-                                buffer = ""
-                        else:
-                            buffer += char
+                    # El decodificador incremental mantiene el estado entre
+                    # bloques: un carácter multibyte partido por el corte de los
+                    # 64 KB ya no se corrompe.
+                    buffer += decoder.decode(chunk)
+                    # Trocear de una pasada en C en vez de iterar carácter a
+                    # carácter en Python (65 536 vueltas y otras tantas
+                    # concatenaciones por bloque, todas reteniendo el GIL y
+                    # frenando el resto del servidor).
+                    parts = LINE_SPLIT_RE.split(buffer)
+                    buffer = parts[-1]          # resto sin terminador
+                    for i in range(0, len(parts) - 1, 2):
+                        text, sep = parts[i], parts[i + 1]
+                        if text:
+                            # '\r' reescribe la línea en sitio (barras de
+                            # progreso); '\n' abre línea nueva.
+                            yield sse_output(text, sep == "\r", pos)
                     continue  # puede haber más pendiente: no dormir aún
 
                 run = get_active_run()
@@ -831,7 +849,7 @@ def stream_log():
                     # El proceso terminó (o este log es de un run anterior) y no
                     # quedan bytes: cerrar con 'done'.
                     if buffer:
-                        yield f"data: {json.dumps({'type': 'output', 'text': buffer, 'replace': False, 'offset': pos}, ensure_ascii=False)}\n\n"
+                        yield sse_output(buffer, False, pos)
                         buffer = ""
                     with process_lock:
                         code = active_process.returncode if active_process is not None else None
