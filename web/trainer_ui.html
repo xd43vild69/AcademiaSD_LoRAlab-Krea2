@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -348,7 +348,7 @@
         .btn-full { width: 100%; }
 
         /* ================= Barra inferior =================
-           Persistente en todos los pasos: plegada muestra estado y
+           Persistent across all steps: collapsed shows status and
            hardware; desplegada, la consola. */
 
         .statusbar {
@@ -611,7 +611,7 @@
             color: var(--text-faint);
         }
 
-        /* ================= Curaduría ================= */
+        /* ================= Curation ================= */
 
         .cur-row {
             display: flex;
@@ -803,7 +803,7 @@
     <div class="app">
 
         <!-- ===================== Navegación por proceso =====================
-             Los pasos siguen el orden real del pipeline. Todas las secciones
+             Steps follow the pipeline order. All sections
              viven en el DOM desde el parseo y sólo se ocultan con CSS: el JS
              accede a los controles por getElementById sin comprobar null, así
              que desmontarlas rompería el guardado en silencio. -->
@@ -815,31 +815,31 @@
 
             <button type="button" class="step-btn active" data-step="project" onclick="showStep('project')">
                 <span class="step-num">1</span>
-                <span class="step-text">Proyecto<span class="step-kind">configuración</span></span>
+                <span class="step-text">Project<span class="step-kind">configuration</span></span>
             </button>
             <button type="button" class="step-btn" data-step="dataset" onclick="showStep('dataset')">
                 <span class="step-num">2</span>
-                <span class="step-text">Dataset<span class="step-kind">validación</span></span>
+                <span class="step-text">Dataset<span class="step-kind">validation</span></span>
             </button>
             <button type="button" class="step-btn" data-step="curation" onclick="showStep('curation')">
                 <span class="step-num">3</span>
-                <span class="step-text">Curaduría<span class="step-kind">validación</span></span>
+                <span class="step-text">Curation<span class="step-kind">validation</span></span>
             </button>
             <button type="button" class="step-btn" data-step="precache" onclick="showStep('precache')">
                 <span class="step-num">4</span>
-                <span class="step-text">Pre-caché<span class="step-kind">configuración</span></span>
+                <span class="step-text">Pre-cache<span class="step-kind">configuration</span></span>
             </button>
             <button type="button" class="step-btn" data-step="train" onclick="showStep('train')">
                 <span class="step-num">5</span>
-                <span class="step-text">Entrenar<span class="step-kind">configuración</span></span>
+                <span class="step-text">Train<span class="step-kind">configuration</span></span>
             </button>
             <button type="button" class="step-btn" data-step="samples" onclick="showStep('samples')">
                 <span class="step-num">6</span>
-                <span class="step-text">Muestras<span class="step-kind">validación</span></span>
+                <span class="step-text">Samples<span class="step-kind">validation</span></span>
             </button>
             <button type="button" class="step-btn" data-step="export" onclick="showStep('export')">
                 <span class="step-num">7</span>
-                <span class="step-text">Exportar<span class="step-kind">configuración</span></span>
+                <span class="step-text">Export<span class="step-kind">configuration</span></span>
             </button>
         </nav>
 
@@ -849,49 +849,49 @@
             <section class="step active" id="step-project">
                 <div class="step-head">
                     <div>
-                        <h2>Proyecto</h2>
-                        <p>El nombre del proyecto deriva las rutas de caché y salida, y la palabra
-                            clave se usa al añadirla a los captions del dataset.</p>
+                        <h2>Project</h2>
+                        <p>The project name determines cache and output paths, and the trigger
+                            word is used when appending to dataset captions.</p>
                     </div>
                 </div>
 
                 <div class="panel">
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Project Name / Proyecto</label>
-                            <input type="text" id="project_name" value="" placeholder="Ej: cherry2"
+                            <label>Project Name</label>
+                            <input type="text" id="project_name" value="" placeholder="e.g. cherry2"
                                 oninput="updateProjectPaths()">
                         </div>
                         <div class="form-group">
-                            <label>Trigger Word / Palabra Clave</label>
+                            <label>Trigger Word</label>
                             <input type="text" id="trigger_word" value="">
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label>Dataset Path / Ruta del Dataset</label>
+                        <label>Dataset Path</label>
                         <div style="display:flex; gap:var(--s2);">
                             <input type="text" id="dataset_path" value="./dataset" onchange="loadDatasetInfo()">
-                            <button type="button" class="btn" onclick="browseFolderNative('dataset')">Explorar</button>
+                            <button type="button" class="btn" onclick="browseFolderNative('dataset')">Browse</button>
                         </div>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Cache Folder / Carpeta Caché (auto)</label>
+                            <label>Cache Folder (auto)</label>
                             <input type="text" id="precache_cache_dir" value="./cached_data_local/default" readonly
-                                title="Ruta informativa generada automáticamente">
+                                title="Automatically generated path">
                         </div>
                         <div class="form-group">
-                            <label>Output Dir / Carpeta Salida (auto)</label>
+                            <label>Output Directory (auto)</label>
                             <input type="text" id="train_output_dir" value="./output_local/default" readonly
-                                title="Ruta informativa generada automáticamente">
+                                title="Automatically generated path">
                         </div>
                     </div>
 
                     <div class="actions">
-                        <button type="button" class="btn" onclick="triggerLoadJson('precache')">Cargar pre-caché</button>
-                        <button type="button" class="btn" onclick="triggerLoadJson('train')">Cargar entrenamiento</button>
+                        <button type="button" class="btn" onclick="triggerLoadJson('precache')">Load pre-cache JSON</button>
+                        <button type="button" class="btn" onclick="triggerLoadJson('train')">Load training JSON</button>
                     </div>
                 </div>
             </section>
@@ -901,8 +901,8 @@
                 <div class="step-head">
                     <div>
                         <h2>Dataset</h2>
-                        <p>Revisa imágenes y captions. El punto verde indica que la imagen tiene
-                            su <code>.txt</code>; el rojo, que le falta.</p>
+                        <p>Inspect images and captions. The green dot indicates the image has its
+                            corresponding <code>.txt</code> file; red indicates missing.</p>
                     </div>
                     <span class="status-badge"><span id="ds-count">0</span>&nbsp;img ·
                         <span id="ds-txt-count">0</span>&nbsp;txt</span>
@@ -910,29 +910,29 @@
 
                 <div class="panel">
                     <div class="ds-toolbar">
-                        <input type="text" class="ds-search" id="ds-search" placeholder="Buscar..."
+                        <input type="text" class="ds-search" id="ds-search" placeholder="Search..."
                             oninput="filterDatasetGridDebounced()">
-                        <button type="button" class="btn btn-sm" onclick="setGridMode('compact')">Pequeño</button>
+                        <button type="button" class="btn btn-sm" onclick="setGridMode('compact')">Small</button>
                         <button type="button" class="btn btn-sm" onclick="setGridMode('normal')">Normal</button>
-                        <button type="button" class="btn btn-sm" onclick="setGridMode('large')">Grande</button>
+                        <button type="button" class="btn btn-sm" onclick="setGridMode('large')">Large</button>
                         <button type="button" class="btn btn-sm" id="btn-toggle-ds"
-                            onclick="toggleDatasetGrid()">Ocultar</button>
+                            onclick="toggleDatasetGrid()">Hide</button>
                         <button type="button" class="btn btn-sm" onclick="addTriggerToAllCaptions()">+ Trigger</button>
                         <button type="button" class="btn btn-sm" onclick="openBatchReplaceModal()"
-                            title="Reemplazar palabra o texto en todo el dataset (F2)">Reemplazar (F2)</button>
-                        <button type="button" class="btn btn-sm" onclick="loadDatasetInfo()">Actualizar</button>
+                            title="Search and replace text across the entire dataset (F2)">Replace (F2)</button>
+                        <button type="button" class="btn btn-sm" onclick="loadDatasetInfo()">Refresh</button>
                     </div>
                 </div>
             </section>
 
-            <!-- ===================== 3. Curaduría ===================== -->
+            <!-- ===================== 3. Curation ===================== -->
             <section class="step" id="step-curation">
                 <div class="step-head">
                     <div>
-                        <h2>Curaduría</h2>
-                        <p>Reparte el dataset en dos grupos por identidad facial. Se ejecuta antes
-                            del pre-caché y al entrenar cada grupo lleva su propio peso: nada se
-                            borra ni se mueve, las imágenes de baja nota siguen entrenando atenuadas.</p>
+                        <h2>Curation</h2>
+                        <p>Splits the dataset into two groups by facial identity. It runs before
+                            pre-caching, and each group receives its own loss weight during training:
+                            nothing is deleted or moved; low-scoring images continue training with attenuated weights.</p>
                     </div>
                 </div>
 
@@ -942,28 +942,28 @@
                         <span class="cur-chip" id="cur-base-1">baseline 2</span>
                         <span class="cur-chip" id="cur-base-2">baseline 3</span>
                         <button type="button" class="btn btn-primary" id="btn-curate"
-                            onclick="runCurate()">Puntuar</button>
+                            onclick="runCurate()">Score</button>
                     </div>
                     <div class="cur-row" id="cur-threshold-row" style="display:none;">
-                        <label style="margin:0; white-space:nowrap;">Umbral</label>
+                        <label style="margin:0; white-space:nowrap;">Threshold</label>
                         <input type="range" class="cur-slider" id="cur-threshold" min="0" max="100" step="1"
                             oninput="onThresholdInput(this.value)">
                         <span id="cur-threshold-val" style="min-width:40px; font-weight:700;">--</span>
                         <button type="button" class="btn btn-sm" onclick="resetThreshold()"
-                            title="Volver al umbral calculado automáticamente">Auto</button>
-                        <button type="button" class="btn btn-sm" onclick="saveCurationOverrides()">Guardar grupos</button>
+                            title="Reset to automatically calculated threshold">Auto</button>
+                        <button type="button" class="btn btn-sm" onclick="saveCurationOverrides()">Save groups</button>
                     </div>
                     <div class="cur-hint" id="cur-hint">
-                        Elige con ★ las <strong>3 imágenes</strong> que mejor representan el look que buscas y
-                        pulsa Puntuar. Se usan tres y se promedia porque una sola foto mete su propio sesgo de
-                        ángulo, expresión e iluminación en la nota de todas las demás.
+                        Select with ★ the <strong>3 baseline images</strong> that best represent your target look and
+                        click Score. Three images are used and averaged to prevent single-photo bias in
+                        angle, expression, and lighting.
                     </div>
                 </div>
             </section>
 
-            <!-- El grid lo comparten Dataset y Curaduría: es el mismo dato con
+            <!-- The grid is shared between Dataset and Curation: same data with
                  distinta lectura. Vive fuera de ambas secciones —entre las dos—
-                 y showStep() lo muestra en cualquiera de los dos pasos, así no
+                 and showStep() displays it in either step, so
                  hay que duplicar ids ni mover nodos por JS. -->
             <div id="ds-groups"></div>
 
@@ -971,33 +971,33 @@
             <section class="step" id="step-precache">
                 <div class="step-head">
                     <div>
-                        <h2>Pre-caché</h2>
-                        <p>Calcula latentes y embeddings una sola vez para reutilizarlos en todos
-                            los entrenamientos sobre este dataset.</p>
+                        <h2>Pre-cache</h2>
+                        <p>Computes latents and text embeddings once to reuse across all
+                            training runs on this dataset.</p>
                     </div>
                 </div>
 
                 <div class="panel">
                     <div class="form-group">
-                        <label>Resolution Mode / Modo de Resolución</label>
+                        <label>Resolution Mode</label>
                         <select id="progressive_mode" onchange="syncProgressive(this.value)">
-                            <option value="off" selected>Off / Clásico (caché plana, resolución libre abajo)</option>
-                            <option value="512">512² constante</option>
-                            <option value="768">768² constante</option>
-                            <option value="1024">1024² constante</option>
-                            <option value="768_1024">768² → 1024² (2 fases)</option>
-                            <option value="512_768_1024">512² → 768² → 1024² (3 fases)</option>
+                            <option value="off" selected>Off (flat cache, single resolution below)</option>
+                            <option value="512">512² constant</option>
+                            <option value="768">768² constant</option>
+                            <option value="1024">1024² constant</option>
+                            <option value="768_1024">768² → 1024² (2 phases)</option>
+                            <option value="512_768_1024">512² → 768² → 1024² (3 phases)</option>
                         </select>
                         <small id="progressive_hint" class="hint"></small>
                     </div>
 
                     <div class="form-group" id="single_res_group">
-                        <label>Resolution / Resolución (px²)</label>
+                        <label>Target Resolution (px²)</label>
                         <select id="target_area_select" onchange="syncResolution(this.value)">
                             <option value="262144">512 × 512 (262 144 px²)</option>
                             <option value="589824" selected>768 × 768 (589 824 px²)</option>
                             <option value="1048576">1024 × 1024 (1 048 576 px²)</option>
-                            <option value="custom">Custom / Personalizada</option>
+                            <option value="custom">Custom</option>
                         </select>
                         <input type="number" id="precache_target_area" value="589824"
                             style="margin-top:var(--s2); display:none;">
@@ -1006,7 +1006,7 @@
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Multiple / Múltiplo</label>
+                            <label>Multiple</label>
                             <select id="precache_multiple">
                                 <option value="16" selected>16</option>
                                 <option value="32">32</option>
@@ -1014,31 +1014,31 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Max Side / Lado Máx</label>
+                            <label>Max Side</label>
                             <input type="number" id="precache_max_side" value="1280">
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label>Max Seq Len / Long. Secuencia</label>
+                        <label>Max Sequence Length</label>
                         <input type="number" id="precache_max_seq_len" value="128">
                     </div>
 
                     <div class="actions">
                         <button type="button" class="btn btn-primary" id="btn-precache"
-                            onclick="runPrecache()">Iniciar pre-caché</button>
-                        <button type="button" class="btn" onclick="savePrecacheSettings()">Guardar ajustes</button>
+                            onclick="runPrecache()">Start Pre-cache</button>
+                        <button type="button" class="btn" onclick="savePrecacheSettings()">Save Settings</button>
                     </div>
                 </div>
             </section>
 
-            <!-- ===================== 5. Entrenar ===================== -->
+            <!-- ===================== 5. Train ===================== -->
             <section class="step" id="step-train">
                 <div class="step-head">
                     <div>
-                        <h2>Entrenar</h2>
-                        <p>Requiere el pre-caché hecho. Si hay un checkpoint, «Iniciar» reanuda
-                            desde el último paso guardado.</p>
+                        <h2>Train</h2>
+                        <p>Requires pre-caching to be completed. If a checkpoint exists, "Start"
+                            resumes from the last saved step.</p>
                     </div>
                     <span class="status-badge" id="checkpoint-badge"></span>
                 </div>
@@ -1046,7 +1046,7 @@
                 <div class="panel">
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Total Steps / Pasos Totales</label>
+                            <label>Total Steps</label>
                             <input type="number" id="train_total_steps" value="1200">
                         </div>
                         <div class="form-group">
@@ -1072,24 +1072,24 @@
                             <input type="number" id="train_batch_size" value="1">
                         </div>
                         <div class="form-group">
-                            <label>Grad Accum Steps</label>
+                            <label>Gradient Accumulation Steps</label>
                             <input type="number" id="train_grad_accum" value="4">
                         </div>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label>LoRA Target / Capas</label>
+                            <label>LoRA Target Modules</label>
                             <select id="train_lora_target">
-                                <option value="all" selected>All / Todas (máx. calidad)</option>
-                                <option value="attn+ff">Attn + FF (sin text_fusion)</option>
-                                <option value="attn">Attn only / Sólo atención (mín. VRAM)</option>
+                                <option value="all" selected>All modules (max quality)</option>
+                                <option value="attn+ff">Attn + FF (without text_fusion)</option>
+                                <option value="attn">Attn only (min VRAM)</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Compact Text / Compactar texto</label>
+                            <label>Compact Text</label>
                             <select id="train_compact_text">
-                                <option value="true" selected>ON (flash attention, requiere Batch 1)</option>
+                                <option value="true" selected>ON (flash attention, requires Batch Size 1)</option>
                                 <option value="false">OFF</option>
                             </select>
                         </div>
@@ -1097,21 +1097,21 @@
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Save Every / Guardar Cada</label>
+                            <label>Save Checkpoint Every (steps)</label>
                             <input type="number" id="train_save_every" value="25">
                         </div>
                         <div class="form-group">
-                            <label>Seed / Semilla</label>
+                            <label>Seed</label>
                             <input type="number" id="train_seed" value="42">
                         </div>
                     </div>
 
                     <div class="actions">
                         <button type="button" class="btn btn-primary" id="btn-train"
-                            onclick="runTrain()">Iniciar / Reanudar</button>
+                            onclick="runTrain()">Start / Resume</button>
                         <button type="button" class="btn btn-danger" id="btn-stop" onclick="stopScript()"
-                            disabled>Detener</button>
-                        <button type="button" class="btn" onclick="saveTrainSettings()">Guardar ajustes</button>
+                            disabled>Stop</button>
+                        <button type="button" class="btn" onclick="saveTrainSettings()">Save Settings</button>
                     </div>
                 </div>
             </section>
@@ -1120,31 +1120,30 @@
             <section class="step" id="step-samples">
                 <div class="step-head">
                     <div>
-                        <h2>Muestras</h2>
-                        <p>Previsualizaciones generadas durante el entrenamiento. Con «cada 0 pasos»
-                            no se genera ninguna.</p>
+                        <h2>Samples</h2>
+                        <p>Sample previews generated during training. Setting to 0 disables preview generation.</p>
                     </div>
                 </div>
 
                 <div class="panel">
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Preview Every / Preview Cada (pasos)</label>
+                            <label>Preview Every (steps)</label>
                             <input type="number" id="train_preview_every" value="0">
                         </div>
                         <div class="form-group">
-                            <label>Caption Mode / Modo Sample</label>
+                            <label>Caption Selection Mode</label>
                             <select id="train_preview_caption_mode">
-                                <option value="first">First / Primero</option>
-                                <option value="random">Random / Aleatorio</option>
-                                <option value="rotate4">Rotate 4 / Rotar 4</option>
+                                <option value="first">First</option>
+                                <option value="random">Random</option>
+                                <option value="rotate4">Rotate 4</option>
                             </select>
                         </div>
                     </div>
                 </div>
 
                 <div class="panel">
-                    <div class="panel-title">Previsualizaciones generadas</div>
+                    <div class="panel-title">Generated Previews</div>
                     <div class="gallery" id="gallery"></div>
                 </div>
             </section>
@@ -1153,29 +1152,29 @@
             <section class="step" id="step-export">
                 <div class="step-head">
                     <div>
-                        <h2>Exportar</h2>
-                        <p>Copia el LoRA final —o el checkpoint de paso más alto— a la carpeta de
-                            modelos de ComfyUI, Forge o A1111.</p>
+                        <h2>Export</h2>
+                        <p>Copies the final LoRA model (or highest step checkpoint) to your
+                            ComfyUI, Forge, or A1111 models folder.</p>
                     </div>
                 </div>
 
                 <div class="panel">
                     <div class="form-group">
-                        <label>Final LoRA Filename / Nombre Final (.safetensors)</label>
+                        <label>Final LoRA Filename (.safetensors)</label>
                         <input type="text" id="export_final_name" value="krea2_lora.safetensors"
-                            placeholder="mi_lora_krea2.safetensors">
+                            placeholder="my_krea2_lora.safetensors">
                     </div>
 
                     <div class="form-group">
-                        <label>UI LoRA Folder / Carpeta models/loras</label>
+                        <label>Target Models Directory (models/loras)</label>
                         <div style="display:flex; gap:var(--s2);">
                             <input type="text" id="export_models_dir" value="" placeholder="C:/ComfyUI/models/loras">
-                            <button type="button" class="btn" onclick="browseFolderNative('export')">Explorar</button>
+                            <button type="button" class="btn" onclick="browseFolderNative('export')">Browse</button>
                         </div>
                     </div>
 
                     <div class="actions">
-                        <button type="button" class="btn btn-primary" onclick="sendToModels()">Enviar a models</button>
+                        <button type="button" class="btn btn-primary" onclick="sendToModels()">Export to Models Folder</button>
                     </div>
                 </div>
             </section>
@@ -1189,7 +1188,7 @@
          perder de vista el log del que está corriendo. -->
     <footer class="statusbar" id="statusbar">
         <div class="sb-head" onclick="toggleStatusbar()">
-            <span class="status-badge badge-idle" id="status-badge">Inactivo</span>
+            <span class="status-badge badge-idle" id="status-badge">Idle</span>
             <span class="sb-spacer"></span>
             <div class="sb-metrics">
                 <span class="metric">
@@ -1209,7 +1208,7 @@
                 </span>
             </div>
             <button type="button" class="btn btn-ghost btn-sm"
-                onclick="event.stopPropagation(); clearTerminal();">Limpiar</button>
+                onclick="event.stopPropagation(); clearTerminal();">Clear</button>
             <span class="sb-caret">▲</span>
         </div>
         <div class="sb-body">
@@ -1217,12 +1216,12 @@
         </div>
     </footer>
 
-    <!-- Modal: editar caption / inspeccionar imagen -->
+    <!-- Modal: edit caption / inspect image -->
     <div class="modal" id="modal" onclick="closeModal(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-head">
                 <h3 id="modal-filename">Filename</h3>
-                <small>Pulsa fuera o Cerrar para salir</small>
+                <small>Click outside or Close to exit</small>
             </div>
             <img id="modal-img" src="" alt="Dataset Image">
             <div class="form-group">
@@ -1230,8 +1229,8 @@
                 <textarea id="modal-txt"></textarea>
             </div>
             <div class="actions">
-                <button type="button" class="btn btn-primary" onclick="saveCurrentCaption()">Guardar caption</button>
-                <button type="button" class="btn" onclick="closeModal()">Cerrar</button>
+                <button type="button" class="btn btn-primary" onclick="saveCurrentCaption()">Save Caption</button>
+                <button type="button" class="btn" onclick="closeModal()">Close</button>
             </div>
         </div>
     </div>
@@ -1239,13 +1238,13 @@
     <!-- Modal: explorador de carpetas (respaldo del selector nativo) -->
     <div class="modal" id="folder-modal" onclick="closeFolderModal(event)">
         <div class="modal-content" onclick="event.stopPropagation()" style="max-width:600px;">
-            <h3>Seleccionar carpeta</h3>
+            <h3>Select Folder</h3>
             <small id="browser-current-path">/</small>
             <div class="drive-selector" id="drive-selector"></div>
             <div class="dir-list" id="dir-list"></div>
             <div class="actions">
-                <button type="button" class="btn btn-primary" onclick="confirmFolderSelection()">Usar carpeta</button>
-                <button type="button" class="btn" onclick="closeFolderModal()">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="confirmFolderSelection()">Use Folder</button>
+                <button type="button" class="btn" onclick="closeFolderModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1254,45 +1253,45 @@
     <div class="modal" id="batch-replace-modal" onclick="closeBatchReplaceModal(event)">
         <div class="modal-content" onclick="event.stopPropagation()" style="max-width:560px;">
             <div class="modal-head">
-                <h3>Reemplazar palabra en captions</h3>
+                <h3>Batch Replace Captions</h3>
                 <button type="button" class="btn btn-ghost btn-sm" onclick="closeBatchReplaceModal()">✕</button>
             </div>
 
             <div class="form-group">
-                <label>Palabra o texto a buscar</label>
-                <input type="text" id="replace-search-input" placeholder="Ej: 1girl"
+                <label>Search Text</label>
+                <input type="text" id="replace-search-input" placeholder="e.g. 1girl"
                     oninput="updateReplaceLiveStats()">
             </div>
 
             <div class="form-group">
-                <label>Reemplazar por</label>
-                <input type="text" id="replace-target-input" placeholder="Ej: woman (vacío para eliminar)"
+                <label>Replace With</label>
+                <input type="text" id="replace-target-input" placeholder="e.g. woman (leave empty to delete)"
                     oninput="updateReplaceLiveStats()">
             </div>
 
             <div class="check-group">
                 <label>
                     <input type="checkbox" id="replace-case-sensitive" checked onchange="updateReplaceLiveStats()">
-                    Sensible a mayúsculas y minúsculas
+                    Case sensitive
                 </label>
                 <label>
                     <input type="checkbox" id="replace-whole-word" checked onchange="updateReplaceLiveStats()">
-                    Coincidir sólo palabra completa
+                    Match whole word only
                 </label>
                 <label>
                     <input type="checkbox" id="replace-clean-commas" checked>
-                    Limpiar comas y espacios sobrantes al eliminar
+                    Clean extra commas and spaces when deleting
                 </label>
             </div>
 
             <div class="info-box" id="replace-live-stats">
-                Escribe un texto a buscar para calcular las coincidencias en el dataset.
+                Enter search text to calculate matches across dataset.
             </div>
 
             <div class="actions">
                 <button type="button" class="btn btn-primary" id="btn-execute-replace"
-                    onclick="executeBatchReplace()" disabled>Reemplazar en todo el dataset</button>
-                <button type="button" class="btn" onclick="closeBatchReplaceModal()">Cancelar</button>
+                    onclick="executeBatchReplace()" disabled>Replace Across Entire Dataset</button>
+                <button type="button" class="btn" onclick="closeBatchReplaceModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1311,13 +1310,13 @@
         let currentBrowserTarget = 'dataset';
         let currentLoadTarget = 'precache';
 
-        // ─────────────── Navegación por pasos ───────────────
+        // ─────────────── Step Navigation ───────────────
         // Las secciones se OCULTAN, nunca se desmontan: el resto del código
         // accede a los controles por getElementById sin comprobar null, y
         // getElementById sigue encontrando elementos con display:none. Sacar
         // una sección del DOM rompería el guardado en silencio.
 
-        // Dataset y Curaduría son dos lecturas del mismo grid, así que ambos
+        // Dataset and Curation are two views of the same grid, so both
         // muestran el contenedor compartido #ds-groups.
         const STEPS_WITH_GRID = ['dataset', 'curation'];
 
@@ -1414,9 +1413,9 @@
 
         // VRAM estimada con batch_size 1, LoRA rank 16 y compact_text activo.
         const VRAM_HINTS = {
-            '262144': '~8.6 GB de VRAM · rápido',
-            '589824': '~9.2 GB de VRAM · ~2.2x más lento que 512² · recomendado para 12 GB',
-            '1048576': '~10.3 GB de VRAM · ajustado en 12 GB, requiere GPU libre'
+            '262144': '~8.6 GB VRAM · fast',
+            '589824': '~9.2 GB VRAM · ~2.2x slower than 512² · recommended for 12 GB',
+            '1048576': '~10.3 GB VRAM · tight on 12 GB, requires free GPU'
         };
 
         // Modo de resolución -> lista de áreas que produce el pre-cache.
@@ -1431,12 +1430,12 @@
         };
 
         const PROGRESSIVE_HINTS = {
-            'off': 'Caché plana en la carpeta del proyecto; la resolución la eliges abajo.',
-            '512': 'Todos los pasos a 512². Salida en phase0_512/ · ' + VRAM_HINTS['262144'],
-            '768': 'Todos los pasos a 768². Salida en phase0_768/ · ' + VRAM_HINTS['589824'],
-            '1024': 'Todos los pasos a 1024². Salida en phase0_1024/ · ' + VRAM_HINTS['1048576'],
-            '768_1024': 'Dos fases con hand-off de pesos (70% / 30%). Pico de VRAM: el de 1024².',
-            '512_768_1024': 'Tres fases con hand-off de pesos (40% / 30% / 30%). Pico de VRAM: el de 1024².'
+            'off': 'Flat cache in project folder; choose resolution below.',
+            '512': 'All steps at 512². Output in phase0_512/ · ' + VRAM_HINTS['262144'],
+            '768': 'All steps at 768². Output in phase0_768/ · ' + VRAM_HINTS['589824'],
+            '1024': 'All steps at 1024². Output in phase0_1024/ · ' + VRAM_HINTS['1048576'],
+            '768_1024': 'Two phases with weight hand-off (70% / 30%). Peak VRAM: 1024² peak.',
+            '512_768_1024': 'Three phases with weight hand-off (40% / 30% / 30%). Peak VRAM: 1024² peak.'
         };
 
         function syncProgressive(val) {
@@ -1450,7 +1449,7 @@
                 // Las constantes reutilizan los subdirs que deja un pre-cache
                 // progresivo: si ya existen, no hace falta volver a cachear.
                 if (val && val !== 'off' && !val.includes('_')) {
-                    text += ' Si ya pre-cacheaste en modo progresivo, el subdir ya existe y puedes entrenar sin repetir el Pre-Caché.';
+                    text += ' If you already pre-cached in progressive mode, the subdirectory already exists and you can train without re-caching.';
                 }
                 hint.textContent = text;
             }
@@ -1467,7 +1466,7 @@
             const hint = document.getElementById('vram_hint');
             if (hint) {
                 hint.textContent = VRAM_HINTS[String(val)] ||
-                    'Resolución personalizada: la VRAM crece de forma aproximadamente lineal con el área.';
+                    'Custom resolution: VRAM usage scales roughly linearly with area.';
             }
         }
 
@@ -1598,10 +1597,10 @@
                         await saveTrainSettings();
                     }
 
-                    alert(`✓ Configuration loaded / Configuración cargada desde:\n${file.name}`);
+                    alert(`✓ Configuration loaded from:\n${file.name}`);
                     loadDatasetInfo();
                 } catch (err) {
-                    alert(`[!] JSON Error / Error al leer JSON: ${err}`);
+                    alert(`[!] JSON Error reading file: ${err}`);
                 }
             };
             reader.readAsText(file);
@@ -1657,7 +1656,7 @@
             const data = await res.json();
             if (data.status === 'ok') {
                 const listStr = data.all_saved ? data.all_saved.join('\n • ') : data.file;
-                alert(`✓ Pre-Cache Settings saved / Configuración Pre-Caché guardada en:\n • ${listStr}`);
+                alert(`✓ Pre-Cache Settings saved to:\n • ${listStr}`);
             }
         }
 
@@ -1689,7 +1688,7 @@
             const data = await res.json();
             if (data.status === 'ok') {
                 const listStr = data.all_saved ? data.all_saved.join('\n • ') : data.file;
-                alert(`✓ Train Settings saved / Configuración de Entrenamiento guardada en:\n • ${listStr}`);
+                alert(`✓ Train Settings saved to:\n • ${listStr}`);
             }
         }
 
@@ -1699,9 +1698,9 @@
                 const data = await res.json();
                 const badge = document.getElementById('checkpoint-badge');
                 if (data.has_checkpoint) {
-                    badge.innerText = `[Resume Step / Paso ${data.current_step}]`;
+                    badge.innerText = `[Resume Step ${data.current_step}]`;
                 } else {
-                    badge.innerText = '[New / Nuevo]';
+                    badge.innerText = '[New Project]';
                 }
             } catch (e) { }
         }
@@ -1762,7 +1761,7 @@
                                 if (msg.type === 'output') {
                                     appendTerminal(msg.text, msg.replace);
                                 } else if (msg.type === 'done') {
-                                    appendTerminal(`\n[SYSTEM] Finished with code / Finalizado con código: ${msg.code}`);
+                                    appendTerminal(`\n[SYSTEM] Finished with code: ${msg.code}`);
                                     streamAbort = null;
                                     setRunningState(false);
                                     loadPreviews();
@@ -1778,7 +1777,7 @@
                 }
                 retries++;
                 if (retries > 60) {
-                    appendTerminal('\n[SYSTEM] Log stream lost — reload the page to reattach / Conexión al log perdida — recarga la página para reenganchar.');
+                    appendTerminal('\n[SYSTEM] Log stream lost — reload page to reattach.');
                     return;
                 }
                 await new Promise(r => setTimeout(r, Math.min(1000 * retries, 5000)));
@@ -1791,7 +1790,7 @@
                 const st = await res.json();
                 if (st.running && st.log) {
                     setRunningState(true);
-                    appendTerminal(`[SYSTEM] Reattached to running process / Reenganchado al proceso en curso: ${st.script} (PID ${st.pid}, desde ${st.started || '?'})`);
+                    appendTerminal(`[SYSTEM] Reattached to running process: ${st.script} (PID ${st.pid}, started ${st.started || '?'})`);
                     attachStream(st.log, -1); // -1: el server manda los últimos 64 KB
                     return true;
                 }
@@ -1801,7 +1800,7 @@
 
         async function startScript(scriptName) {
             document.getElementById('terminal').innerHTML = '';
-            appendTerminal(`[SYSTEM] Launching / Iniciando ${scriptName}...`);
+            appendTerminal(`[SYSTEM] Launching ${scriptName}...`);
             setRunningState(true);
 
             try {
@@ -1824,7 +1823,7 @@
                 }
                 await attachStream(data.log, 0);
             } catch (err) {
-                appendTerminal(`\n[SYSTEM] Execution error / Error de ejecución: ${err}`);
+                appendTerminal(`\n[SYSTEM] Execution error: ${err}`);
                 setRunningState(false);
             }
         }
@@ -1840,7 +1839,7 @@
         }
 
         async function stopScript() {
-            appendTerminal('\n[SYSTEM] Sending stop signal... / Enviando señal de detención...');
+            appendTerminal('\n[SYSTEM] Sending stop signal...');
             await fetch('/api/stop', { method: 'POST' });
         }
 
@@ -1849,11 +1848,11 @@
             const finalName = document.getElementById('export_final_name').value.trim();
 
             if (!targetDir) {
-                alert('Please select or enter a target Models directory / Por favor selecciona la carpeta destino models/lora.');
+                alert('Please select or enter a target Models directory.');
                 return;
             }
 
-            appendTerminal(`\n[SYSTEM] Exporting LoRA model to / Exportando LoRA a: ${targetDir}...`);
+            appendTerminal(`\n[SYSTEM] Exporting LoRA model to: ${targetDir}...`);
 
             try {
                 const res = await fetch('/api/export-lora', {
@@ -1863,14 +1862,14 @@
                 });
                 const data = await res.json();
                 if (data.status === 'ok') {
-                    alert(`✓ LoRA exported successfully / LoRA exportado con éxito:\n${data.filename}\n\nCopied from / Copiado desde: ${data.source}`);
-                    appendTerminal(`[SYSTEM] ✓ Export completed / Exportación completada: ${data.dest}`);
+                    alert(`✓ LoRA exported successfully:\n${data.filename}\n\nCopied from: ${data.source}`);
+                    appendTerminal(`[SYSTEM] ✓ Export completed: ${data.dest}`);
                 } else {
-                    alert(`[!] Export Error / Error de exportación: ${data.error}`);
+                    alert(`[!] Export Error: ${data.error}`);
                     appendTerminal(`[SYSTEM] [!] Export failed: ${data.error}`);
                 }
             } catch (e) {
-                alert(`[!] Network Error / Error de red: ${e}`);
+                alert(`[!] Network Error: ${e}`);
             }
         }
 
@@ -1882,17 +1881,17 @@
             const badge = document.getElementById('status-badge');
             if (running) {
                 badge.className = 'status-badge badge-running';
-                badge.innerText = 'En ejecución';
+                badge.innerText = 'Running';
                 // Al arrancar algo, desplegar la consola: es lo que el usuario
                 // quiere ver justo entonces, esté en el paso que esté.
                 toggleStatusbar(true);
             } else {
                 badge.className = 'status-badge badge-idle';
-                badge.innerText = 'Inactivo';
+                badge.innerText = 'Idle';
             }
         }
 
-        // ── Curaduría / Curation ──────────────────────────────────────────────
+        // ── Curation ──────────────────────────────────────────────
         // El servidor entrega el informe y los ajustes ya fusionados; aquí sólo
         // se replica la resolución de grupo para que mover el slider repueble los
         // dos grupos al instante, sin ida y vuelta al servidor.
@@ -1965,7 +1964,7 @@
                 document.getElementById('cur-threshold-val').innerText = `${Math.round(thr * 100)}%`;
             }
             document.getElementById('btn-curate').innerText =
-                curationMeta.available ? 'Re-puntuar / Re-score' : 'Puntuar / Score';
+                curationMeta.available ? 'Re-score' : 'Score';
         }
 
         function onThresholdInput(value) {
@@ -2017,11 +2016,11 @@
             });
             const data = await res.json();
             if (data.status === 'ok') {
-                alert(`✓ Grupos guardados / Groups saved:\n\n` +
+                alert(`✓ Groups saved:\n\n` +
                     `  Buena calificación : ${data.good_count} (×${curationMeta.weight_good})\n` +
                     `  Baja calificación  : ${data.bad_count} (×${curationMeta.weight_bad})\n` +
                     `  Reasignadas a mano : ${data.override_count}\n\n` +
-                    `Se aplicarán al entrenar. / Applied on training.`);
+                    `Applied during training.`);
             } else {
                 alert(`Error: ${data.error}`);
             }
@@ -2071,18 +2070,18 @@
 
             const hasCaption = img.has_txt && img.caption && img.caption.trim().length > 0;
             const dotClass = hasCaption ? 'caption-dot dot-green' : 'caption-dot dot-red';
-            const dotTitle = hasCaption ? 'Caption OK / Texto existente' : 'No Caption / Sin texto';
+            const dotTitle = hasCaption ? 'Caption OK' : 'No Caption';
 
             let scoreBadge = '';
             if (curationMeta.available) {
                 if (img.score === null || img.score === undefined) {
-                    scoreBadge = `<span class="score-badge noface" title="No se detectó cara — no puntuable no es lo mismo que mala; se queda en el grupo bueno">sin cara</span>`;
+                    scoreBadge = `<span class="score-badge noface" title="No face detected — non-scorable is kept in good group">no face</span>`;
                 } else {
                     scoreBadge = `<span class="score-badge ${group}">${Math.round(img.score * 100)}%</span>`;
                 }
             }
             const isOverride = !!curationGroupOverrides[stemOf(img.file)];
-            const ovrBadge = isOverride ? `<span class="ovr-badge" title="Reasignada a mano">manual</span>` : '';
+            const ovrBadge = isOverride ? `<span class="ovr-badge" title="Manually reassigned">manual</span>` : '';
             const isBase = curationBaselines.includes(stemOf(img.file));
             const safeFile = escapeHtml(img.file);
 
@@ -2092,11 +2091,11 @@
                          alt="${safeFile}" loading="lazy" decoding="async">
                     <span class="${dotClass}" title="${dotTitle}"></span>
                     ${scoreBadge}${ovrBadge}
-                    <div class="card-btn star${isBase ? ' on' : ''}" title="Usar como baseline">★</div>
-                    <div class="card-btn edit" title="Editar caption">✎</div>
+                    <div class="card-btn star${isBase ? ' on' : ''}" title="Use as baseline">★</div>
+                    <div class="card-btn edit" title="Edit caption">✎</div>
                     <div class="img-filename-tag">${safeFile}</div>
                 </div>
-                <div class="caption">${img.caption ? escapeHtml(img.caption) : '<em>No .txt caption / Sin texto</em>'}</div>
+                <div class="caption">${img.caption ? escapeHtml(img.caption) : '<em>No .txt caption</em>'}</div>
             `;
             card.querySelector('.star').onclick = (e) => { e.stopPropagation(); toggleBaseline(img.file); };
             card.querySelector('.edit').onclick = (e) => {
@@ -2131,13 +2130,13 @@
             const good = images.filter(i => groupOf(i) === 'good');
             const bad = images.filter(i => groupOf(i) === 'bad');
 
-            [['good', '✅ Buena calificación / Good', good, curationMeta.weight_good],
-             ['bad', '⚠️ Baja calificación / Low', bad, curationMeta.weight_bad]
+            [['good', '✅ Good Quality', good, curationMeta.weight_good],
+             ['bad', '⚠️ Low Quality', bad, curationMeta.weight_bad]
             ].forEach(([key, label, list, weight]) => {
                 const head = document.createElement('div');
                 head.className = `ds-group-head ${key}`;
-                head.innerHTML = `<span>${label} — ${list.length} imagen(es)</span>` +
-                    `<span class="weight-tag">peso ×${weight}</span>`;
+                head.innerHTML = `<span>${label} — ${list.length} image(s)</span>` +
+                    `<span class="weight-tag">weight ×${weight}</span>`;
                 host.appendChild(head);
 
                 const grid = document.createElement('div');
@@ -2146,8 +2145,8 @@
                     const empty = document.createElement('div');
                     empty.className = 'ds-empty';
                     empty.innerText = key === 'bad'
-                        ? 'Ninguna imagen por debajo del umbral. / No images below the threshold.'
-                        : 'Ninguna imagen por encima del umbral. / No images above the threshold.';
+                        ? 'No images below threshold.'
+                        : 'No images above the threshold.';
                     grid.appendChild(empty);
                 } else {
                     // Peores primero dentro de cada grupo: lo que hay que revisar
@@ -2170,24 +2169,24 @@
         function setGridMode(mode) {
             dsGridMode = mode;
             dsGridHidden = false;
-            document.getElementById('btn-toggle-ds').innerText = 'Ocultar';
+            document.getElementById('btn-toggle-ds').innerText = 'Hide';
             filterDatasetGrid();
         }
 
         function toggleDatasetGrid() {
             dsGridHidden = !dsGridHidden;
             document.getElementById('btn-toggle-ds').innerText =
-                dsGridHidden ? 'Mostrar' : 'Ocultar';
+                dsGridHidden ? 'Show' : 'Hide';
             filterDatasetGrid();
         }
 
         async function addTriggerToAllCaptions() {
             const trigger = document.getElementById('trigger_word').value;
             if (!trigger) {
-                alert('Please enter a Trigger Word first / Por favor ingresa una palabra clave primero.');
+                alert('Please enter a Trigger Word first.');
                 return;
             }
-            if (confirm(`Add trigger "${trigger}" to all dataset captions? / ¿Añadir palabra clave a todos los captions?`)) {
+            if (confirm(`Add trigger "${trigger}" to all dataset captions?`)) {
                 await fetch('/api/batch-caption', {
                     method: 'POST',
                     body: JSON.stringify({ trigger_word: trigger })
@@ -2214,12 +2213,12 @@
                 data.previews.forEach(filename => {
                     const card = document.createElement('div');
                     card.className = 'preview-card';
-                    card.onclick = () => openModal(`/api/preview/${filename}`, filename, `Generated preview / Previsualización: ${filename}`);
+                    card.onclick = () => openModal(`/api/preview/${filename}`, filename, `Generated preview: ${filename}`);
 
                     let stepTag = filename;
                     const match = filename.match(/preview_step_(\d+)\.png/i);
                     if (match) {
-                        stepTag = `Step / Paso ${match[1]}`;
+                        stepTag = `Step ${match[1]}`;
                     }
 
                     card.innerHTML = `
@@ -2254,7 +2253,7 @@
             });
             const data = await res.json();
             if (data.status === 'ok') {
-                alert('✓ Caption saved / Caption guardado!');
+                alert('✓ Caption saved!');
                 closeModal();
                 loadDatasetInfo();
             }
@@ -2290,7 +2289,7 @@
 
             const parentDiv = document.createElement('div');
             parentDiv.className = 'dir-item';
-            parentDiv.innerHTML = `<strong>📁 .. [Up / Subir]</strong>`;
+            parentDiv.innerHTML = `<strong>📁 .. [Up]</strong>`;
             parentDiv.onclick = () => openFolderBrowserWeb(target, data.parent_path);
             dirList.appendChild(parentDiv);
 
@@ -2347,7 +2346,7 @@
             const statsDiv = document.getElementById('replace-live-stats');
 
             if (!searchText || searchText === '') {
-                statsDiv.innerHTML = '<span style="color:var(--text-muted);">Ingresa un texto a buscar para calcular las coincidencias.</span>';
+                statsDiv.innerHTML = '<span style="color:var(--text-muted);">Enter search text to calculate matches.</span>';
                 statsDiv.style.borderColor = 'var(--panel-border)';
                 btnExecute.disabled = true;
                 return;
@@ -2373,17 +2372,17 @@
                 });
 
                 if (totalMatches > 0) {
-                    statsDiv.innerHTML = `<span style="color:#4ade80; font-weight:600;">✓ Coincidencias encontradas:</span> ` +
-                        `<strong>${totalMatches}</strong> apariciones en <strong>${affectedFiles}</strong> de ${allDatasetImages.length} imágenes.`;
+                    statsDiv.innerHTML = `<span style="color:#4ade80; font-weight:600;">✓ Matches found:</span> ` +
+                        `<strong>${totalMatches}</strong> occurrences in <strong>${affectedFiles}</strong> of ${allDatasetImages.length} images.`;
                     statsDiv.style.borderColor = '#4ade80';
                     btnExecute.disabled = false;
                 } else {
-                    statsDiv.innerHTML = `<span style="color:#f87171;">✕ No se encontraron coincidencias</span> para "<strong>${escapeHtml(searchText)}</strong>".`;
+                    statsDiv.innerHTML = `<span style="color:#f87171;">✕ No matches found</span> for "<strong>${escapeHtml(searchText)}</strong>".`;
                     statsDiv.style.borderColor = '#f87171';
                     btnExecute.disabled = true;
                 }
             } catch (e) {
-                statsDiv.innerHTML = `<span style="color:#f87171;">Patrón de búsqueda inválido.</span>`;
+                statsDiv.innerHTML = `<span style="color:#f87171;">Invalid search pattern.</span>`;
                 btnExecute.disabled = true;
             }
         }
@@ -2399,7 +2398,7 @@
             if (!searchText) return;
 
             btnExecute.disabled = true;
-            btnExecute.innerText = '⏳ Reemplazando...';
+            btnExecute.innerText = '⏳ Replacing...';
 
             try {
                 const res = await fetch('/api/batch-replace-caption', {
@@ -2415,9 +2414,9 @@
                 });
 
                 if (!res.ok) {
-                    let errMsg = `Servidor respondió con código HTTP ${res.status}.`;
+                    let errMsg = `Server responded with HTTP code ${res.status}.`;
                     if (res.status === 404) {
-                        errMsg += ' La ruta /api/batch-replace-caption no fue encontrada. Por favor reinicia el servidor backend (server.py).';
+                        errMsg += ' Route /api/batch-replace-caption not found. Please restart backend server (server.py).';
                     }
                     throw new Error(errMsg);
                 }
@@ -2428,12 +2427,12 @@
                     alert(`✓ Reemplazo completado con éxito:\n\n- Ocurrencias cambiadas: ${data.occurrences_replaced}\n- Archivos actualizados: ${data.files_updated}`);
                     loadDatasetInfo();
                 } else {
-                    alert(`Error: ${data.error || 'No se pudo realizar el reemplazo.'}`);
+                    alert(`Error: ${data.error || 'Could not complete replacement.'}`);
                 }
             } catch (err) {
                 alert(`Error: ${err.message}`);
             } finally {
-                btnExecute.innerText = '🔄 Reemplazar en Todo el Dataset';
+                btnExecute.innerText = '🔄 Replace Across Entire Dataset';
                 btnExecute.disabled = false;
             }
         }
