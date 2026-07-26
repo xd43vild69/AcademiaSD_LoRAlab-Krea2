@@ -203,13 +203,61 @@
             font-size: var(--fs-xl);
             font-weight: 700;
             letter-spacing: -0.02em;
+            display: inline-flex;
+            align-items: center;
+            gap: var(--s2);
+            position: relative;
+            cursor: pointer;
         }
 
-        .step-head p {
-            font-size: var(--fs-sm);
+        .step-head h2 .info-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
             color: var(--text-dim);
-            margin-top: 2px;
-            max-width: 68ch;
+            font-size: var(--fs-xs);
+            font-weight: 600;
+            transition: all .15s;
+        }
+
+        .step-head h2:hover .info-icon {
+            color: var(--accent);
+            border-color: var(--accent);
+            background: var(--accent-soft);
+        }
+
+        .step-head h2 .tooltip-box {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            z-index: 999;
+            width: max-content;
+            max-width: 440px;
+            padding: var(--s2) var(--s3);
+            background: #192136;
+            border: 1px solid var(--border-strong);
+            border-radius: var(--r1);
+            color: var(--text);
+            font-size: var(--fs-xs);
+            font-weight: 400;
+            line-height: 1.45;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity .15s ease, visibility .15s ease, transform .15s ease;
+            transform: translateY(-4px);
+        }
+
+        .step-head h2:hover .tooltip-box {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
         }
 
         .panel {
@@ -855,9 +903,7 @@
             <section class="step active" id="step-project">
                 <div class="step-head">
                     <div>
-                        <h2>Project</h2>
-                        <p>The project name determines cache and output paths, and the trigger
-                            word is used when appending to dataset captions.</p>
+                        <h2>Project <span class="info-icon">ⓘ</span><span class="tooltip-box">The project name determines cache and output paths, and the trigger word is used when appending to dataset captions.</span></h2>
                     </div>
                 </div>
 
@@ -906,9 +952,7 @@
             <section class="step" id="step-dataset">
                 <div class="step-head">
                     <div>
-                        <h2>Dataset</h2>
-                        <p>Inspect images and captions. The green dot indicates the image has its
-                            corresponding <code>.txt</code> file; red indicates missing.</p>
+                        <h2>Dataset <span class="info-icon">ⓘ</span><span class="tooltip-box">Inspect images and captions. The green dot indicates the image has its corresponding .txt file; red indicates missing.</span></h2>
                     </div>
                     <span class="status-badge"><span id="ds-count">0</span>&nbsp;img ·
                         <span id="ds-txt-count">0</span>&nbsp;txt</span>
@@ -935,10 +979,7 @@
             <section class="step" id="step-curation">
                 <div class="step-head">
                     <div>
-                        <h2>Curation</h2>
-                        <p>Splits the dataset into two quality groups by similarity. It runs before
-                            pre-caching, and each group receives its own loss weight during training:
-                            nothing is deleted or moved; low-scoring images continue training with attenuated weights.</p>
+                        <h2>Curation <span class="info-icon">ⓘ</span><span class="tooltip-box">Splits the dataset into two quality groups by similarity. It runs before pre-caching, and each group receives its own loss weight during training: nothing is deleted or moved; low-scoring images continue training with attenuated weights.</span></h2>
                     </div>
                 </div>
 
@@ -986,9 +1027,7 @@
             <section class="step" id="step-precache">
                 <div class="step-head">
                     <div>
-                        <h2>Pre-cache</h2>
-                        <p>Computes latents and text embeddings once to reuse across all
-                            training runs on this dataset.</p>
+                        <h2>Pre-cache <span class="info-icon">ⓘ</span><span class="tooltip-box">Computes latents and text embeddings once to reuse across all training runs on this dataset.</span></h2>
                     </div>
                 </div>
 
@@ -1051,9 +1090,7 @@
             <section class="step" id="step-train">
                 <div class="step-head">
                     <div>
-                        <h2>Train</h2>
-                        <p>Requires pre-caching to be completed. If a checkpoint exists, "Start"
-                            resumes from the last saved step.</p>
+                        <h2>Train <span class="info-icon">ⓘ</span><span class="tooltip-box">Requires pre-caching to be completed. If a checkpoint exists, 'Start' resumes from the last saved step.</span></h2>
                     </div>
                     <span class="status-badge" id="checkpoint-badge"></span>
                 </div>
@@ -1135,8 +1172,7 @@
             <section class="step" id="step-samples">
                 <div class="step-head">
                     <div>
-                        <h2>Samples</h2>
-                        <p>Sample previews generated during training. Setting to 0 disables preview generation.</p>
+                        <h2>Samples <span class="info-icon">ⓘ</span><span class="tooltip-box">Sample previews generated during training. Setting to 0 disables preview generation.</span></h2>
                     </div>
                 </div>
 
@@ -1167,9 +1203,7 @@
             <section class="step" id="step-export">
                 <div class="step-head">
                     <div>
-                        <h2>Export</h2>
-                        <p>Copies the final LoRA model (or highest step checkpoint) to your
-                            ComfyUI, Forge, or A1111 models folder.</p>
+                        <h2>Export <span class="info-icon">ⓘ</span><span class="tooltip-box">Copies the final LoRA model (or highest step checkpoint) to your ComfyUI, Forge, or A1111 models folder.</span></h2>
                     </div>
                 </div>
 
@@ -1922,6 +1956,12 @@
         let curationThreshold = null;     // null = usar el automático del informe
         let curationGroupOverrides = {};  // stem -> "good" | "bad"
         let curationBaselines = [];       // stems, exactamente 3 para poder puntuar
+        let baselinesByMode = {
+            'face': [],
+            'clothes': [],
+            'body-type': [],
+            'tattoo': []
+        };
         let dsGridMode = 'normal';
         let dsGridHidden = false;
 

@@ -240,12 +240,13 @@ def load_curation(dataset_dir):
     cfg = read_json_file(PRECACHE_CONFIG, {})
     cur_cfg = cfg.get("curation") or {}
     baselines_by_mode = cur_cfg.get("baselines_by_mode") or {}
+    active_baselines = baselines_by_mode.get(mode) or report.get("baselines") or cur_cfg.get("baselines") or []
 
     meta = {
         "available": bool(images),
         "generated": report.get("generated"),
         "mode": mode,
-        "baselines": report.get("baselines") or [],
+        "baselines": active_baselines,
         "baselines_by_mode": baselines_by_mode,
         "auto_threshold": auto_threshold,
         "threshold": threshold,
@@ -590,7 +591,21 @@ def save_precache():
 
         # Merge, no reemplazo: la UI sólo envía las claves que sabe pintar, así que un
         # write directo borraba en silencio todo lo demás que el script sí lee.
-        data = {**read_json_file(PRECACHE_CONFIG, {}), **data}
+        existing_cfg = read_json_file(PRECACHE_CONFIG, {})
+        curation_incoming = data.get("curation")
+        if isinstance(curation_incoming, dict):
+            existing_curation = existing_cfg.get("curation") if isinstance(existing_cfg.get("curation"), dict) else {}
+            merged_curation = {**existing_curation, **curation_incoming}
+            mode = str(merged_curation.get("mode", "face")).lower()
+            incoming_baselines = merged_curation.get("baselines") or []
+            by_mode = merged_curation.get("baselines_by_mode") if isinstance(merged_curation.get("baselines_by_mode"), dict) else {}
+            if len(incoming_baselines) == 3:
+                by_mode[mode] = incoming_baselines
+            merged_curation["baselines_by_mode"] = by_mode
+            merged_curation["baselines"] = incoming_baselines
+            data["curation"] = merged_curation
+
+        data = {**existing_cfg, **data}
 
         proj = data.get("project_name", "").strip()
         cache_dir_name = f"{CACHE_ROOT}/{proj}" if proj else f"{CACHE_ROOT}/default"

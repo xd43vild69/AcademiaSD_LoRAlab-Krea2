@@ -156,6 +156,18 @@ class CLIPEmbedder:
         self._processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
         self._model.eval()
 
+    def zero_shot_prob(self, crop_pil, target_prompt, distractor_prompt):
+        self._ensure_loaded()
+        import torch
+        try:
+            inputs = self._processor(text=[target_prompt[:77], distractor_prompt[:77]], images=crop_pil, return_tensors="pt", padding=True)
+            with torch.no_grad():
+                outputs = self._model(**inputs)
+                probs = outputs.logits_per_image.softmax(dim=1).cpu().numpy()[0]
+                return float(probs[0])
+        except Exception:
+            return 0.5
+
     def get_caption_text(self, image_path):
         txt_path = os.path.splitext(image_path)[0] + ".txt"
         if os.path.isfile(txt_path):
@@ -247,7 +259,7 @@ class BodyEmbedder:
 
 
 class TattooEmbedder:
-    """Extractor de tatuajes (parches de tinta/saliencia + CLIP + caption)."""
+    """Extractor de tatuajes (anclaje por texto zero-shot + saliencia de tinta + CLIP + caption)."""
 
     def __init__(self):
         self.clip = CLIPEmbedder()
@@ -259,6 +271,23 @@ class TattooEmbedder:
                 rgb_img = pil.convert("RGB")
                 img_bgr = cv2.cvtColor(np.array(rgb_img), cv2.COLOR_RGB2BGR)
         except Exception:
+            return None
+
+        caption = self.clip.get_caption_text(image_path)
+
+        # 1. Medir probabilidad zero-shot de presencia de tatuaje con CLIP
+        tattoo_prob = self.clip.zero_shot_prob(
+            rgb_img,
+            "a photo of a person with visible tattoos or body ink art",
+            "a photo of plain smooth skin without any tattoos"
+        )
+
+        # 2. Refuerzo por palabras clave en el caption
+        if caption and any(w in caption.lower() for w in ["tattoo", "ink", "tatuaje", "tatto", "body art"]):
+            tattoo_prob = max(tattoo_prob, 0.90)
+
+        # Si no es baseline y la probabilidad de tatuaje es muy baja (< 0.20), enviar a low quality (return None)
+        if not is_baseline and tattoo_prob < 0.20:
             return None
 
         crop = None
@@ -284,16 +313,16 @@ class TattooEmbedder:
             crop = None
 
         if crop is None:
-            if is_baseline:
-                crop = rgb_img
-            else:
-                crop = None
+            crop = rgb_img
 
-        if crop is None:
+        emb = self.clip.embed_crop_and_caption(crop, caption)
+        if emb is None:
             return None
 
-        caption = self.clip.get_caption_text(image_path)
-        return self.clip.embed_crop_and_caption(crop, caption)
+        # Pondera el vector incorporando el factor de presencia de tatuaje
+        weighted_emb = np.append(emb * 0.80, float(tattoo_prob) * 0.20)
+        norm = np.linalg.norm(weighted_emb)
+        return weighted_emb / norm if norm > 0 else weighted_emb
 
 
 def get_embedder(mode):
