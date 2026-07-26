@@ -1230,6 +1230,7 @@
             </div>
             <div class="actions">
                 <button type="button" class="btn btn-primary" onclick="saveCurrentCaption()">Save Caption</button>
+                <button type="button" class="btn btn-danger" onclick="deleteCurrentDatasetImage()">Delete Image</button>
                 <button type="button" class="btn" onclick="closeModal()">Close</button>
             </div>
         </div>
@@ -2102,11 +2103,15 @@
                 e.stopPropagation();
                 openModal(fullUrl(img), img.file, img.caption || '');
             };
-            // Con curaduría activa el clic reasigna de grupo (la acción principal
-            // aquí); sin curar mantiene el comportamiento de siempre.
-            card.onclick = curationMeta.available
-                ? () => toggleGroup(img.file)
-                : () => openModal(fullUrl(img), img.file, img.caption || '');
+            // Click card: in Curation step toggles group; in Dataset or other steps opens edit/delete modal.
+            card.onclick = () => {
+                const activeStep = document.querySelector('.step-btn.active')?.dataset?.step;
+                if (activeStep === 'curation' && curationMeta.available) {
+                    toggleGroup(img.file);
+                } else {
+                    openModal(fullUrl(img), img.file, img.caption || '');
+                }
+            };
             return card;
         }
 
@@ -2256,6 +2261,28 @@
                 alert('✓ Caption saved!');
                 closeModal();
                 loadDatasetInfo();
+            }
+        }
+
+        async function deleteCurrentDatasetImage() {
+            if (!currentEditingFilename) return;
+            if (confirm(`Are you sure you want to delete "${currentEditingFilename}" and its .txt caption file from the dataset?\nThis action cannot be undone.`)) {
+                try {
+                    const res = await fetch('/api/delete-dataset-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ filename: currentEditingFilename })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'ok') {
+                        closeModal();
+                        loadDatasetInfo();
+                    } else {
+                        alert(`Error: ${data.error || 'Failed to delete image.'}`);
+                    }
+                } catch (e) {
+                    alert(`Error: ${e}`);
+                }
             }
         }
 

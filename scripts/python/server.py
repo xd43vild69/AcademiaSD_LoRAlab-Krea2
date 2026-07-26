@@ -1086,6 +1086,39 @@ def save_caption():
         return jsonify({"status": "error", "error": str(exc)}), 500
 
 
+@app.route("/api/delete-dataset-image", methods=["POST"])
+def delete_dataset_image():
+    try:
+        data = request.get_json(force=True)
+        filename = data.get("filename")
+        if not filename:
+            return jsonify({"status": "error", "error": "Filename is required"}), 400
+
+        dataset_dir = get_dataset_dir()
+        img_path = (dataset_dir / filename).resolve()
+        img_path.relative_to(dataset_dir.resolve())
+
+        if not img_path.is_file() or img_path.suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp"):
+            return jsonify({"status": "error", "error": "File not found or invalid image format"}), 404
+
+        # Delete the image file
+        img_path.unlink()
+
+        # Delete corresponding .txt caption file if it exists
+        txt_path = img_path.with_suffix(".txt")
+        if txt_path.is_file():
+            try:
+                txt_path.unlink()
+            except Exception:
+                pass
+
+        return jsonify({"status": "ok", "deleted": filename})
+    except Exception as exc:
+        return jsonify({"status": "error", "error": str(exc)}), 500
+
+
+
+
 @app.route("/api/batch-caption", methods=["POST"])
 def batch_caption():
     try:
