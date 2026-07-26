@@ -1220,8 +1220,15 @@
     <div class="modal" id="modal" onclick="closeModal(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-head">
-                <h3 id="modal-filename">Filename</h3>
-                <small>Click outside or Close to exit</small>
+                <div>
+                    <h3 id="modal-filename">Filename</h3>
+                    <small id="modal-nav-info">Click outside or Close to exit</small>
+                </div>
+                <div style="display:flex; gap:var(--s2); align-items:center;">
+                    <button type="button" class="btn btn-sm" onclick="navigateModalImage(-1)" title="Previous image (Cmd+Shift+[)">◄ Prev</button>
+                    <button type="button" class="btn btn-sm" onclick="navigateModalImage(1)" title="Next image (Cmd+Shift+])">Next ►</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal()" title="Close (Esc)">✕</button>
+                </div>
             </div>
             <img id="modal-img" src="" alt="Dataset Image">
             <div class="form-group">
@@ -2120,11 +2127,14 @@
                 + (dsGridHidden ? ' hidden' : '');
         }
 
+        let currentFilteredImages = [];
+
         function renderDatasetGrid(images) {
             const host = document.getElementById('ds-groups');
             host.innerHTML = '';
 
             if (!curationMeta.available) {
+                currentFilteredImages = images.slice();
                 const grid = document.createElement('div');
                 grid.className = gridClass();
                 images.forEach(img => grid.appendChild(makeCard(img)));
@@ -2132,8 +2142,9 @@
                 return;
             }
 
-            const good = images.filter(i => groupOf(i) === 'good');
-            const bad = images.filter(i => groupOf(i) === 'bad');
+            const good = images.filter(i => groupOf(i) === 'good').sort((a, b) => (a.score ?? 2) - (b.score ?? 2));
+            const bad = images.filter(i => groupOf(i) === 'bad').sort((a, b) => (a.score ?? 2) - (b.score ?? 2));
+            currentFilteredImages = good.concat(bad);
 
             [['good', '✅ Good Quality', good, curationMeta.weight_good],
              ['bad', '⚠️ Low Quality', bad, curationMeta.weight_bad]
@@ -2154,10 +2165,7 @@
                         : 'No images above the threshold.';
                     grid.appendChild(empty);
                 } else {
-                    // Peores primero dentro de cada grupo: lo que hay que revisar
-                    // primero es siempre lo que está más cerca de la frontera.
-                    list.slice().sort((a, b) => (a.score ?? 2) - (b.score ?? 2))
-                        .forEach(img => grid.appendChild(makeCard(img)));
+                    list.forEach(img => grid.appendChild(makeCard(img)));
                 }
                 host.appendChild(grid);
             });
@@ -2244,23 +2252,66 @@
             document.getElementById('modal-img').src = imgSrc;
             document.getElementById('modal-txt').value = text;
             document.getElementById('modal').classList.add('active');
+
+            const list = (currentFilteredImages && currentFilteredImages.length > 0) ? currentFilteredImages : allDatasetImages;
+            const idx = list.findIndex(i => i.file === filename);
+            const countStr = (idx !== -1 && list.length > 0) ? ` (${idx + 1} of ${list.length})` : '';
+            const hint = document.getElementById('modal-nav-info');
+            if (hint) {
+                hint.innerText = `Image ${countStr} · Cmd+Shift+] / [ to navigate`;
+            }
         }
 
         function closeModal(e) {
             document.getElementById('modal').classList.remove('active');
         }
 
-        async function saveCurrentCaption() {
+        function navigateModalImage(dir) {
+            const modal = document.getElementById('modal');
+            if (!modal || !modal.classList.contains('active')) return;
+
+            const list = (currentFilteredImages && currentFilteredImages.length > 0) ? currentFilteredImages : allDatasetImages;
+            if (!list || list.length === 0) return;
+
+            const currentIndex = list.findIndex(img => img.file === currentEditingFilename);
+            if (currentIndex === -1) return;
+
+            let targetIndex = currentIndex + dir;
+            if (targetIndex < 0) targetIndex = list.length - 1;
+            if (targetIndex >= list.length) targetIndex = 0;
+
+            const targetImg = list[targetIndex];
+            if (targetImg) {
+                const currentTxt = document.getElementById('modal-txt').value;
+                const currentObj = list[currentIndex];
+                if (currentObj && currentTxt !== (currentObj.caption || '')) {
+                    saveCurrentCaption(true);
+                }
+                openModal(fullUrl(targetImg), targetImg.file, targetImg.caption || '');
+            }
+        }
+
+        async function saveCurrentCaption(silent = false) {
             const newCaption = document.getElementById('modal-txt').value;
+            const filename = currentEditingFilename;
+            if (!filename) return;
+
             const res = await fetch('/api/save-caption', {
                 method: 'POST',
-                body: JSON.stringify({ filename: currentEditingFilename, caption: newCaption })
+                body: JSON.stringify({ filename: filename, caption: newCaption })
             });
             const data = await res.json();
             if (data.status === 'ok') {
-                alert('✓ Caption saved!');
-                closeModal();
-                loadDatasetInfo();
+                const imgObj = allDatasetImages.find(i => i.file === filename);
+                if (imgObj) {
+                    imgObj.caption = newCaption;
+                    imgObj.has_txt = newCaption.trim().length > 0;
+                }
+                if (!silent) {
+                    alert('✓ Caption saved!');
+                    closeModal();
+                    loadDatasetInfo();
+                }
             }
         }
 
@@ -2465,10 +2516,26 @@
         }
 
         document.addEventListener('keydown', function(e) {
+            const modal = document.getElementById('modal');
+            const isModalActive = modal && modal.classList.contains('active');
+
+            // Keyboard navigation for dataset image modal: Cmd + Shift + ] (Next) / Cmd + Shift + [ (Prev)
+            const isModifier = e.metaKey || e.ctrlKey;
+            if (isModalActive && isModifier && e.shiftKey) {
+                if (e.key === ']' || e.key === '}' || e.code === 'BracketRight') {
+                    e.preventDefault();
+                    navigateModalImage(1);
+                    return;
+                }
+                if (e.key === '[' || e.key === '{' || e.code === 'BracketLeft') {
+                    e.preventDefault();
+                    navigateModalImage(-1);
+                    return;
+                }
+            }
+
             if (e.key === 'F2') {
                 e.preventDefault();
-                // El atajo puede pulsarse desde cualquier paso; el reemplazo
-                // sólo tiene sentido viendo el dataset, así que se navega allí.
                 showStep('dataset');
                 if (dsGridHidden) {
                     toggleDatasetGrid();
@@ -2476,6 +2543,10 @@
                 openBatchReplaceModal();
             }
             if (e.key === 'Escape') {
+                if (isModalActive) {
+                    closeModal();
+                    return;
+                }
                 const replaceModal = document.getElementById('batch-replace-modal');
                 if (replaceModal && replaceModal.classList.contains('active')) {
                     closeBatchReplaceModal();
