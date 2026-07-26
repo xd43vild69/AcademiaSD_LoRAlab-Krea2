@@ -1,9 +1,5 @@
 # AcademiaSD LoRAlab-Krea2
 
-![AcademiaSD_LoRAlab-Krea2](assets/portada.jpg)
-
-![Interface](assets/interface.jpg)
-
 ---
 
 ## 🌟 Overview
