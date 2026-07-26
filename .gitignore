@@ -88,3 +88,4 @@ ehthumbs.db
 .vscode/
 .idea/
 .claude/
+logs/

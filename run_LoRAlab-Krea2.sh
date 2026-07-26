@@ -5,6 +5,19 @@
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_EXE=""
 
+# Auto-wrap en tmux: el server sobrevive a la caída de la sesión SSH y correr
+# este script otra vez reengancha a la sesión existente (-A) en vez de duplicar.
+# Desactivable con NO_TMUX=1.
+if [ -z "$TMUX" ] && [ -z "$NO_TMUX" ] && command -v tmux &>/dev/null; then
+    echo ""
+    echo "[INFO] Servidor en sesión tmux 'loralab'."
+    echo "       Desconectar sin parar: Ctrl+B y luego D"
+    echo "       Volver a la sesión:    ./run_LoRAlab-Krea2.sh  (o: tmux attach -t loralab)"
+    echo "       Sin tmux:              NO_TMUX=1 ./run_LoRAlab-Krea2.sh"
+    echo ""
+    exec tmux new-session -A -s loralab "NO_TMUX=1 '$BASE_DIR/run_LoRAlab-Krea2.sh'"
+fi
+
 echo ""
 echo "================================================================"
 echo "       ACADEMIASD - KREA-2 LORA TRAINER (Linux)"

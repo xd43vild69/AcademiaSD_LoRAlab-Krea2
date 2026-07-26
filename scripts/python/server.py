@@ -10,6 +10,8 @@ import os
 import subprocess
 import sys
 import threading
+import time
+from datetime import datetime
 import importlib.util
 import signal
 import shutil
@@ -99,11 +101,21 @@ CURATION_OVERRIDES_NAME = "curation_overrides.json"
 CACHE_ROOT = "cached_data_local"
 OUTPUT_ROOT = "output_local"
 
+# Los procesos lanzados escriben su salida a un log en disco (no a una PIPE) y
+# su identidad queda en RUN_STATE_FILE. Así el entrenamiento no depende de que
+# el navegador —ni siquiera este server— sigan vivos: cualquier server que
+# arranque después redescubre el run leyendo este archivo.
+LOGS_DIR = PROJECT_ROOT / "logs"
+RUN_STATE_FILE = LOGS_DIR / ".run_state.json"
+KEEP_LOGS = 10
+
 app = Flask(__name__)
 
+# Caché en memoria del último Popen lanzado por ESTE server (sirve para reap y
+# terminate de emergencia). La fuente de verdad del estado es RUN_STATE_FILE.
 active_process = None
 active_script = None
-process_lock = threading.Lock()
+process_lock = threading.RLock()
 
 
 # =============================================================================
@@ -247,18 +259,71 @@ def load_curation(dataset_dir):
     return meta, per_image
 
 
-def get_status():
+def _pid_matches(pid, argv):
+    """¿Sigue vivo el PID y es realmente nuestro proceso (no un PID reciclado)?"""
+    try:
+        import psutil
+        proc = psutil.Process(int(pid))
+        if not proc.is_running() or proc.status() == psutil.STATUS_ZOMBIE:
+            return False
+        if argv:
+            cmdline = proc.cmdline()
+            # El último argumento es la ruta del script: suficiente para
+            # distinguir nuestro entrenador de un PID reciclado por otro proceso.
+            return bool(cmdline) and cmdline[-1] == argv[-1]
+        return True
+    except Exception:
+        return False
+
+
+def get_active_run():
+    """Run activo según RUN_STATE_FILE, o None.
+
+    El disco es la fuente de verdad: un server recién reiniciado ve el
+    entrenamiento que dejó corriendo su predecesor. Si el PID murió (o fue
+    reciclado por otro proceso), limpia el state file de paso.
+    """
     global active_process
     global active_script
 
     with process_lock:
-        if active_process is None:
-            return {"running": False, "script": None, "pid": None}
-        if active_process.poll() is not None:
+        if active_process is not None:
+            active_process.poll()  # reap del zombie si nuestro hijo ya terminó
+
+        state = read_json_file(RUN_STATE_FILE, {})
+        if not state.get("pid"):
+            return None
+        if not _pid_matches(state["pid"], state.get("argv")):
+            try:
+                RUN_STATE_FILE.unlink()
+            except OSError:
+                pass
             active_process = None
             active_script = None
-            return {"running": False, "script": None, "pid": None}
-        return {"running": True, "script": active_script, "pid": active_process.pid}
+            return None
+        return state
+
+
+def _prune_logs():
+    try:
+        logs = sorted(LOGS_DIR.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for stale in logs[KEEP_LOGS:]:
+            stale.unlink()
+    except OSError:
+        pass
+
+
+def get_status():
+    run = get_active_run()
+    if run is None:
+        return {"running": False, "script": None, "pid": None, "log": None}
+    return {
+        "running": True,
+        "script": run.get("script"),
+        "pid": run.get("pid"),
+        "log": run.get("log"),
+        "started": run.get("started"),
+    }
 
 
 # =============================================================================
@@ -650,100 +715,147 @@ def run_script():
             return jsonify({"status": "error", "error": f"Script not found / Script no encontrado: {script_name}"}), 404
 
         with process_lock:
-            if active_process is not None and active_process.poll() is None:
-                return jsonify({"status": "error", "error": f"Process already running / Proceso en ejecución: {active_script}"}), 409
+            running = get_active_run()
+            if running is not None:
+                return jsonify({"status": "error", "error": f"Process already running / Proceso en ejecución: {running.get('script')}"}), 409
+
+            LOGS_DIR.mkdir(parents=True, exist_ok=True)
+            _prune_logs()
+            log_name = f"{script_name}_{datetime.now().strftime('%Y%m%d-%H%M%S')}.log"
+            log_path = LOGS_DIR / log_name
 
             command = [sys.executable, "-u", str(script_path)]
 
-            creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+            # El proceso vive en su propia sesión (POSIX) / grupo (Windows) y
+            # escribe directo al log: sobrevive a la desconexión del navegador,
+            # a la caída del SSH y a la muerte de este server.
+            popen_kwargs = {}
+            if os.name == "nt":
+                popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+            else:
+                popen_kwargs["start_new_session"] = True
 
-            process = subprocess.Popen(
-                command,
-                cwd=str(PROJECT_ROOT),
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                bufsize=1,
-                creationflags=creation_flags
-            )
+            log_fh = open(log_path, "wb", buffering=0)
+            try:
+                process = subprocess.Popen(
+                    command,
+                    cwd=str(PROJECT_ROOT),
+                    stdin=subprocess.DEVNULL,
+                    stdout=log_fh,
+                    stderr=subprocess.STDOUT,
+                    **popen_kwargs,
+                )
+            finally:
+                log_fh.close()  # el hijo conserva su propio descriptor
 
+            write_json_file(RUN_STATE_FILE, {
+                "pid": process.pid,
+                "script": script_name,
+                "log": log_name,
+                "started": datetime.now().isoformat(timespec="seconds"),
+                "argv": command,
+            })
             active_process = process
             active_script = script_name
 
-        def stream():
-            global active_process
-            global active_script
+        return jsonify({"status": "started", "script": script_name, "pid": process.pid, "log": log_name})
 
-            yield f"data: {json.dumps({'type': 'start', 'script': script_name}, ensure_ascii=False)}\n\n"
+    except Exception as exc:
+        return jsonify({"status": "error", "error": str(exc)}), 500
 
+
+@app.route("/api/stream", methods=["GET"])
+def stream_log():
+    """Tail SSE de un log de run. Reengancha sin tocar el proceso.
+
+    ?log=<nombre>   log a seguir (de /api/run o /api/status)
+    ?offset=<byte>  posición inicial; sin él, los últimos 64 KB
+    """
+    log_name = request.args.get("log", "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+\.log", log_name):
+        return jsonify({"status": "error", "error": "Invalid log name"}), 400
+    log_path = LOGS_DIR / log_name
+
+    try:
+        start_offset = int(request.args.get("offset", "-1"))
+    except ValueError:
+        start_offset = -1
+
+    def generate():
+        pos = start_offset
+        if pos < 0:
             try:
-                if process.stdout is not None:
-                    buffer = ""
-                    while True:
-                        char = process.stdout.read(1)
-                        if not char:
+                pos = max(0, log_path.stat().st_size - 64 * 1024)
+            except OSError:
+                pos = 0
+
+        yield f"data: {json.dumps({'type': 'start', 'log': log_name, 'offset': pos}, ensure_ascii=False)}\n\n"
+
+        buffer = ""
+        try:
+            while True:
+                chunk = b""
+                try:
+                    with log_path.open("rb") as f:
+                        f.seek(pos)
+                        chunk = f.read(65536)
+                except OSError:
+                    pass
+
+                if chunk:
+                    pos += len(chunk)
+                    for char in chunk.decode("utf-8", errors="replace"):
+                        if char == "\r":
                             if buffer:
-                                yield f"data: {json.dumps({'type': 'output', 'text': buffer, 'replace': False}, ensure_ascii=False)}\n\n"
-                            break
-                        if char == '\r':
-                            if buffer:
-                                yield f"data: {json.dumps({'type': 'output', 'text': buffer, 'replace': True}, ensure_ascii=False)}\n\n"
+                                yield f"data: {json.dumps({'type': 'output', 'text': buffer, 'replace': True, 'offset': pos}, ensure_ascii=False)}\n\n"
                                 buffer = ""
-                        elif char == '\n':
+                        elif char == "\n":
                             if buffer:
-                                yield f"data: {json.dumps({'type': 'output', 'text': buffer, 'replace': False}, ensure_ascii=False)}\n\n"
+                                yield f"data: {json.dumps({'type': 'output', 'text': buffer, 'replace': False, 'offset': pos}, ensure_ascii=False)}\n\n"
                                 buffer = ""
                         else:
                             buffer += char
+                    continue  # puede haber más pendiente: no dormir aún
 
-                return_code = process.wait()
-                yield f"data: {json.dumps({'type': 'done', 'script': script_name, 'code': return_code}, ensure_ascii=False)}\n\n"
+                run = get_active_run()
+                if run is None or run.get("log") != log_name:
+                    # El proceso terminó (o este log es de un run anterior) y no
+                    # quedan bytes: cerrar con 'done'.
+                    if buffer:
+                        yield f"data: {json.dumps({'type': 'output', 'text': buffer, 'replace': False, 'offset': pos}, ensure_ascii=False)}\n\n"
+                        buffer = ""
+                    with process_lock:
+                        code = active_process.returncode if active_process is not None else None
+                    yield f"data: {json.dumps({'type': 'done', 'log': log_name, 'code': code, 'offset': pos}, ensure_ascii=False)}\n\n"
+                    break
 
-            except GeneratorExit:
-                pass
-            finally:
-                with process_lock:
-                    if active_process is process:
-                        active_process = None
-                        active_script = None
+                time.sleep(0.3)
+        except GeneratorExit:
+            # El cliente se fue. El proceso escribe a disco y ni se entera.
+            pass
 
-        return Response(stream(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
-    except Exception as exc:
-        with process_lock:
-            active_process = None
-            active_script = None
-        return jsonify({"status": "error", "error": str(exc)}), 500
+    return Response(generate(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.route("/api/stop", methods=["POST"])
 def stop_script():
-    global active_process
-    global active_script
-
-    with process_lock:
-        process = active_process
-        script = active_script
-
-    if process is None or process.poll() is not None:
-        with process_lock:
-            active_process = None
-            active_script = None
+    run = get_active_run()
+    if run is None:
         return jsonify({"status": "not_running"})
 
+    pid = int(run["pid"])
+    script = run.get("script")
     try:
         if os.name == "nt":
-            process.send_signal(signal.CTRL_BREAK_EVENT)
+            os.kill(pid, signal.CTRL_BREAK_EVENT)
         else:
-            process.send_signal(signal.SIGINT)
-
+            # SIGINT al PID (no al grupo): en modo progresivo el orquestador ya
+            # reenvía la señal a su hijo. El entrenador guarda checkpoint y sale.
+            os.kill(pid, signal.SIGINT)
         return jsonify({"status": "terminating", "script": script})
-    except Exception as exc:
+    except Exception:
         try:
-            process.terminate()
+            os.kill(pid, signal.SIGTERM)
         except Exception:
             pass
         return jsonify({"status": "terminated", "script": script})

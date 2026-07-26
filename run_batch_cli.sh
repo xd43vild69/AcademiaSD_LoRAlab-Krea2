@@ -6,6 +6,17 @@
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_PYTHON=""
 
+# Auto-wrap en tmux: el batch sobrevive a la caída de la sesión SSH; volver a
+# ejecutar el script reengancha (-A). Desactivable con NO_TMUX=1.
+if [ -z "$TMUX" ] && [ -z "$NO_TMUX" ] && command -v tmux &>/dev/null; then
+    echo ""
+    echo "[INFO] Batch en sesión tmux 'loralab-batch'."
+    echo "       Desconectar sin parar: Ctrl+B y luego D"
+    echo "       Volver a la sesión:    tmux attach -t loralab-batch"
+    echo ""
+    exec tmux new-session -A -s loralab-batch "NO_TMUX=1 '$BASE_DIR/run_batch_cli.sh' $*"
+fi
+
 # Buscar entorno virtual
 if [ -f "$BASE_DIR/.venv/bin/python" ]; then
     VENV_PYTHON="$BASE_DIR/.venv/bin/python"

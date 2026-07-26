@@ -1634,6 +1634,79 @@
             term.scrollTop = term.scrollHeight;
         }
 
+        // El proceso corre desacoplado en el servidor y escribe a un log; este
+        // stream sólo lo tailea. Cerrar/recargar la página no afecta al proceso:
+        // al volver, reattachIfRunning() reengancha donde iba.
+        let streamAbort = null;
+
+        async function attachStream(logName, offset) {
+            if (streamAbort) { streamAbort.abort(); }
+            let lastOffset = offset;
+            let retries = 0;
+
+            while (true) {
+                const ctrl = new AbortController();
+                streamAbort = ctrl;
+                try {
+                    const response = await fetch(`/api/stream?log=${encodeURIComponent(logName)}&offset=${lastOffset}`, { signal: ctrl.signal });
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder('utf-8');
+                    let buffer = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        retries = 0;
+                        buffer += decoder.decode(value, { stream: true });
+
+                        const lines = buffer.split('\n\n');
+                        buffer = lines.pop();
+
+                        for (const line of lines) {
+                            if (!line.startsWith('data: ')) continue;
+                            try {
+                                const msg = JSON.parse(line.slice(6));
+                                if (typeof msg.offset === 'number') lastOffset = msg.offset;
+                                if (msg.type === 'output') {
+                                    appendTerminal(msg.text, msg.replace);
+                                } else if (msg.type === 'done') {
+                                    appendTerminal(`\n[SYSTEM] Finished with code / Finalizado con código: ${msg.code}`);
+                                    streamAbort = null;
+                                    setRunningState(false);
+                                    loadPreviews();
+                                    checkCheckpointInfo();
+                                    return;
+                                }
+                            } catch (e) { }
+                        }
+                    }
+                    // Stream cortado sin 'done' (red/proxy): reintentar desde el offset.
+                } catch (err) {
+                    if (ctrl.signal.aborted) return; // sustituido por otro stream a propósito
+                }
+                retries++;
+                if (retries > 60) {
+                    appendTerminal('\n[SYSTEM] Log stream lost — reload the page to reattach / Conexión al log perdida — recarga la página para reenganchar.');
+                    return;
+                }
+                await new Promise(r => setTimeout(r, Math.min(1000 * retries, 5000)));
+            }
+        }
+
+        async function reattachIfRunning() {
+            try {
+                const res = await fetch('/api/status');
+                const st = await res.json();
+                if (st.running && st.log) {
+                    setRunningState(true);
+                    appendTerminal(`[SYSTEM] Reattached to running process / Reenganchado al proceso en curso: ${st.script} (PID ${st.pid}, desde ${st.started || '?'})`);
+                    attachStream(st.log, -1); // -1: el server manda los últimos 64 KB
+                    return true;
+                }
+            } catch (e) { }
+            return false;
+        }
+
         async function startScript(scriptName) {
             document.getElementById('terminal').innerHTML = '';
             appendTerminal(`[SYSTEM] Launching / Iniciando ${scriptName}...`);
@@ -1645,38 +1718,22 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ script: scriptName })
                 });
+                const data = await response.json();
 
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder('utf-8');
-                let buffer = '';
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    buffer += decoder.decode(value, { stream: true });
-
-                    const lines = buffer.split('\n\n');
-                    buffer = lines.pop();
-
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            try {
-                                const msg = JSON.parse(line.slice(6));
-                                if (msg.type === 'output') {
-                                    appendTerminal(msg.text, msg.replace);
-                                } else if (msg.type === 'done') {
-                                    appendTerminal(`\n[SYSTEM] Finished with code / Finalizado con código: ${msg.code}`);
-                                }
-                            } catch (e) { }
-                        }
+                if (data.status !== 'started') {
+                    appendTerminal(`\n[SYSTEM] ${data.error || 'Error'}`);
+                    if (response.status === 409) {
+                        // Ya hay un proceso corriendo (p. ej. de antes de recargar): reenganchar.
+                        await reattachIfRunning();
+                    } else {
+                        setRunningState(false);
                     }
+                    return;
                 }
+                await attachStream(data.log, 0);
             } catch (err) {
                 appendTerminal(`\n[SYSTEM] Execution error / Error de ejecución: ${err}`);
-            } finally {
                 setRunningState(false);
-                loadPreviews();
-                checkCheckpointInfo();
             }
         }
 
@@ -2060,6 +2117,7 @@
         }
         setInterval(loadPreviews, 8000);
         loadPreviews();
+        reattachIfRunning();
 
         function openModal(imgSrc, filename, text) {
             currentEditingFilename = filename;

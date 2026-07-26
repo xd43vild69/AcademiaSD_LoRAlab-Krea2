@@ -1507,6 +1507,11 @@ def train_krea2():
         signal.signal(signal.SIGINT, handle_signal)
         if hasattr(signal, "SIGBREAK"):
             signal.signal(signal.SIGBREAK, handle_signal)
+        # Lanzado a mano por SSH sin tmux, el cierre de la terminal manda SIGHUP:
+        # guardar checkpoint en vez de morir sin más. (Vía server no llega: el
+        # proceso corre en su propia sesión.)
+        if hasattr(signal, "SIGHUP"):
+            signal.signal(signal.SIGHUP, handle_signal)
     except Exception:
         pass
 
