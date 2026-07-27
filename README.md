@@ -2,6 +2,9 @@
 
 ---
 
+
+![AcademiaSD](assets/portada.jpg)
+
 ## 🌟 Overview
 
 **AcademiaSD LoRAlab-Krea2** is an advanced, high-performance training suite and web interface designed for training high-quality LoRA models on **Krea-2 (Rectified Flow / Diffusion Transformer)** architectures.
