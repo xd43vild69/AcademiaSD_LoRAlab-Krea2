@@ -1,0 +1,53 @@
+# Excluir modelo baked-in (se descarga at runtime)
+Krea-2-NF4/
+
+# Excluir venv local (se reconstruye en Docker)
+venv/
+
+# Excluir cache/outputs generados
+cached_data_local/
+output_local/
+
+# Excluir datos de prueba
+dataset/
+
+# Excluir Git y docs
+.git/
+.gitignore
+*.md
+docs/
+
+# Excluir progresivas y logs
+.progressive_phases/
+logs/
+.thumb_cache/
+
+# Excluir bytecode Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Excluir IDEs
+.vscode/
+.idea/
+.pytest_cache/
+
+# Excluir volúmenes locales (se montan en docker-compose)
+datasets/
+output/
+cache/
+models/
+ssh/
+certs/
+auth/
+
+# Excluir temporales
+*.tmp
+*.log
+.env
+.env.local

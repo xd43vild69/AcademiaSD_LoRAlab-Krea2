@@ -855,6 +855,30 @@
 
 <body>
 
+    <!-- Login Modal (Docker deployment) -->
+    <div id="loginModal" style="
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5); display: flex; align-items: center;
+        justify-content: center; z-index: 9999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+        <div style="
+            background: #141a2e; border: 1px solid #3a4767; border-radius: 8px;
+            padding: 32px; width: 90%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);">
+            <h2 style="color: #e8ecf6; margin: 0 0 24px 0; font-size: 24px; font-weight: 600;">LoRAlab Login</h2>
+            <form id="loginForm" style="display: flex; flex-direction: column; gap: 16px;">
+                <input type="text" id="loginUser" placeholder="Usuario" required
+                    style="padding: 10px 12px; background: #1b2338; border: 1px solid #2a3550; color: #e8ecf6; border-radius: 4px;">
+                <input type="password" id="loginPass" placeholder="Contraseña" required
+                    style="padding: 10px 12px; background: #1b2338; border: 1px solid #2a3550; color: #e8ecf6; border-radius: 4px;">
+                <button type="submit" style="
+                    padding: 10px; background: #6366f1; color: #e8ecf6; border: none;
+                    border-radius: 4px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                    Ingresar
+                </button>
+                <div id="loginError" style="color: #ef4444; font-size: 12px; display: none;"></div>
+            </form>
+        </div>
+    </div>
+
     <!-- Selector oculto para cargar JSON. triggerLoadJson() lo pulsa por
          código, así que debe existir siempre, fuera de cualquier paso. -->
     <input type="file" id="json_file_input" accept=".json" style="display:none;" onchange="handleJsonFileLoad(event)">
@@ -2646,6 +2670,44 @@
                 }
             }
         });
+
+        // =====================================================================
+        // LOGIN LOGIC (Docker deployment with authentication)
+        // =====================================================================
+        async function initializeLogin() {
+            try {
+                const res = await fetch('/api/profile');
+                if (res.ok) {
+                    document.getElementById('loginModal').style.display = 'none';
+                    return;
+                }
+            } catch (e) { }
+            document.getElementById('loginModal').style.display = 'flex';
+            document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = document.getElementById('loginUser').value;
+                const password = document.getElementById('loginPass').value;
+                try {
+                    const res = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    if (res.ok) {
+                        document.getElementById('loginModal').style.display = 'none';
+                        document.getElementById('loginUser').value = '';
+                        document.getElementById('loginPass').value = '';
+                    } else {
+                        document.getElementById('loginError').innerText = '❌ Credenciales inválidas';
+                        document.getElementById('loginError').style.display = 'block';
+                    }
+                } catch (e) {
+                    document.getElementById('loginError').innerText = '❌ Error de conexión';
+                    document.getElementById('loginError').style.display = 'block';
+                }
+            });
+        }
+        document.addEventListener('DOMContentLoaded', initializeLogin);
     </script>
 </body>
 

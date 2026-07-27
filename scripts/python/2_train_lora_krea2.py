@@ -54,8 +54,9 @@ def from_root(path):
 
 
 # Carpetas contenedoras: todo lo generado se agrupa aquí en vez de en la raíz.
-CACHE_ROOT  = os.path.join(PROJECT_ROOT, "cached_data_local")
-OUTPUT_ROOT = os.path.join(PROJECT_ROOT, "output_local")
+# En Docker, usar variables de entorno; en local, usar defaults.
+CACHE_ROOT  = os.getenv("CACHE_DIR", os.path.join(PROJECT_ROOT, "cached_data_local"))
+OUTPUT_ROOT = os.getenv("OUTPUT_DIR", os.path.join(PROJECT_ROOT, "output_local"))
 
 # ── DEFAULTS / VALORES POR DEFECTO ──────────────────────────────────────────
 # Todo lo añadido tras el bloque original es aditivo y opt-in: con el sidecar

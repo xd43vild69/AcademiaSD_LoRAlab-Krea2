@@ -57,17 +57,37 @@ def ensure_package(package_name, import_name=None):
 
 ensure_package("Flask", "flask")
 ensure_package("psutil", "psutil")
+ensure_package("Flask-Limiter", "flask_limiter")
 
 from flask import (
     Flask,
     Response,
     jsonify,
     request,
-    send_from_directory
+    send_from_directory,
+    session,
+    make_response
 )
+from functools import wraps
 
 # Silenciar registros HTTP recurrentes de Werkzeug en consola
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
+
+# Importar módulos de autenticación (Docker deployment)
+try:
+    from auth_module import authenticate, create_session_token, verify_session_token, add_user
+    AUTH_ENABLED = True
+except ImportError:
+    AUTH_ENABLED = False
+    print("[!] auth_module no disponible — autenticación deshabilitada (dev mode)")
+
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    LIMITER_ENABLED = True
+except ImportError:
+    LIMITER_ENABLED = False
+    print("[!] Flask-Limiter no disponible — rate limiting deshabilitado")
 
 
 # =============================================================================
@@ -120,6 +140,28 @@ THUMB_WIDTHS = (192, 384)          # 1x y 2x del recuadro más grande del grid
 IMAGE_MAX_AGE = 31536000           # 1 año: seguro porque la URL está versionada
 
 app = Flask(__name__)
+
+# Configurar sesiones seguras para Docker/HTTPS
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.secret_key = os.urandom(32)  # Secret dinámico por sesión
+
+# Inicializar rate limiter si está disponible
+if LIMITER_ENABLED:
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=["100 per minute"],
+        storage_uri="memory://",
+    )
+else:
+    class DummyLimiter:
+        def limit(self, *args, **kwargs):
+            return lambda f: f
+        def exempt(self, f):
+            return f
+    limiter = DummyLimiter()
 
 # Caché en memoria del último Popen lanzado por ESTE server (sirve para reap y
 # terminate de emergencia). La fuente de verdad del estado es RUN_STATE_FILE.
@@ -282,6 +324,81 @@ def _pid_matches(pid, argv):
         return True
     except Exception:
         return False
+
+
+# =============================================================================
+# AUTHENTICATION HELPERS
+# =============================================================================
+
+def login_required(f):
+    """Decorador para proteger endpoints que requieren autenticación."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not AUTH_ENABLED:
+            # Sin autenticación en dev mode
+            return f(*args, **kwargs)
+
+        # Verificar token en sesión
+        token = session.get('auth_token')
+        if not token or not verify_session_token(token):
+            return jsonify({"error": "Unauthorized"}), 401
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def get_current_user():
+    """Obtener username del usuario autenticado, o None."""
+    if not AUTH_ENABLED:
+        return "admin"
+    token = session.get('auth_token')
+    return verify_session_token(token) if token else None
+
+
+# =============================================================================
+# AUTH ENDPOINTS
+# =============================================================================
+
+@app.route("/api/login", methods=["POST"])
+@limiter.limit("5 per 15 minutes") if LIMITER_ENABLED else lambda f: f
+def login():
+    """Login endpoint: recibe username/password, devuelve token."""
+    if not AUTH_ENABLED:
+        return jsonify({"status": "ok", "user": "admin"})
+
+    data = request.get_json(force=True) if request.is_json else {}
+    username = data.get("username", "")
+    password = data.get("password", "")
+
+    if not authenticate(username, password):
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    token = create_session_token(username, expiry_minutes=480)
+    resp = make_response(jsonify({"status": "ok", "user": username}))
+    resp.set_cookie("auth_token", token, httponly=True, secure=True, samesite="Lax", max_age=480*60)
+    return resp
+
+
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    """Logout endpoint: revoca sesión."""
+    if AUTH_ENABLED:
+        token = session.get('auth_token')
+        if token:
+            from auth_module import revoke_session
+            revoke_session(token)
+    resp = make_response(jsonify({"status": "ok"}))
+    resp.delete_cookie("auth_token")
+    return resp
+
+
+@app.route("/api/profile", methods=["GET"])
+def profile():
+    """Obtener perfil del usuario autenticado."""
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify({"user": user})
 
 
 def get_active_run():
@@ -584,6 +701,7 @@ def get_settings():
 
 
 @app.route("/api/save-precache", methods=["POST"])
+@login_required
 def save_precache():
     try:
         data = request.get_json(force=True)
@@ -658,6 +776,7 @@ def save_precache():
 
 
 @app.route("/api/save-train", methods=["POST"])
+@login_required
 def save_train():
     try:
         data = request.get_json(force=True)
@@ -724,6 +843,7 @@ def checkpoint_info():
 
 
 @app.route("/api/run", methods=["POST"])
+@login_required
 def run_script():
     global active_process
     global active_script
@@ -877,6 +997,7 @@ def stream_log():
 
 
 @app.route("/api/stop", methods=["POST"])
+@login_required
 def stop_script():
     run = get_active_run()
     if run is None:
@@ -1227,9 +1348,30 @@ if __name__ == "__main__":
     print("=" * 70)
     print(f"  Base Dir / Carpeta  : {PROJECT_ROOT}")
     print(f"  Python Interpreter  : {sys.executable}")
-    print(f"  URL                 : http://127.0.0.1:5000")
+
+    # Determinar protocolo y URL según contexto (Docker vs local dev)
+    ssl_context = None
+    cert_file = Path("/data/certs/cert.pem")
+    key_file = Path("/data/certs/key.pem")
+    host = os.getenv("SERVER_HOST", "127.0.0.1")
+    port = int(os.getenv("SERVER_PORT", "5000"))
+
+    if cert_file.exists() and key_file.exists():
+        # Docker/Producción: usar HTTPS con certificados
+        ssl_context = (str(cert_file), str(key_file))
+        protocol = "https"
+    else:
+        # Dev mode: HTTP sin SSL
+        protocol = "http"
+
+    print(f"  URL                 : {protocol}://{host}:{port}")
+    if AUTH_ENABLED:
+        print(f"  Authentication      : ENABLED")
     print("=" * 70 + "\n")
 
-    threading.Timer(1.2, open_browser).start()
+    # Abrir navegador solo en dev local
+    if host == "127.0.0.1" and not cert_file.exists():
+        threading.Timer(1.2, open_browser).start()
 
-    app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)
+    # Lanzar Flask con SSL si existe
+    app.run(host=host, port=port, ssl_context=ssl_context, debug=False, threaded=True)

@@ -1,0 +1,71 @@
+version: '3.9'
+
+services:
+  loralab:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: loralab:latest
+    container_name: loralab_trainer
+
+    ports:
+      - "5000:5000"    # Web UI (HTTPS)
+      - "2222:22"      # SSH (remapped from 22 to 2222)
+
+    volumes:
+      - ./datasets:/data/datasets:rw           # User datasets
+      - ./output:/data/output:rw               # Training checkpoints
+      - ./cache:/data/cache:rw                 # Cached latents/embeddings
+      - ./models:/data/models:rw               # HF model cache
+      - ./ssh:/data/ssh:rw                     # SSH keys/authorized_keys
+      - ./certs:/data/certs:rw                 # TLS certificates
+      - ./auth:/data/auth:rw                   # Login credentials
+      - ./logs:/data/logs:rw                   # Training logs
+
+    environment:
+      # HuggingFace token (copy from .env)
+      HUGGINGFACE_TOKEN: "${HUGGINGFACE_TOKEN:-}"
+
+      # Web & SSH ports (internal)
+      SSH_PORT: "22"
+      WEB_PORT: "5000"
+
+      # Credentials (change before production)
+      ADMIN_USER: "${ADMIN_USER:-admin}"
+      ADMIN_PASS: "${ADMIN_PASS:-change_me_now}"
+
+      # Paths inside container
+      DATASET_PATH: "/data/datasets"
+      CACHE_DIR: "/data/cache"
+      OUTPUT_DIR: "/data/output"
+      HF_HOME: "/data/models"
+
+      # Logging
+      LOG_LEVEL: "INFO"
+
+    # GPU support (nvidia-runtime required)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    # Keep container running
+    stdin_open: true
+    tty: true
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Resource limits
+    mem_limit: 32g
+    memswap_limit: 32g
+    shm_size: 8g
+
+# Named volumes (optional, for persistence across compose down)
+volumes:
+  models:
+  cache:
+  output:

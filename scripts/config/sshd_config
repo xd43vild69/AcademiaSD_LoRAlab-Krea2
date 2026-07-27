@@ -1,0 +1,55 @@
+# SSH Server hardened configuration for LoRAlab Docker
+
+# Network and Protocol
+Port 22
+AddressFamily any
+Protocol 2
+
+# Authentication
+PermitRootLogin no
+PasswordAuthentication yes
+PubkeyAuthentication yes
+MaxAuthTries 3
+MaxSessions 5
+
+# Security hardening
+StrictModes yes
+X11Forwarding no
+PermitUserEnvironment no
+PermitTunnel no
+AllowTcpForwarding no
+AllowAgentForwarding no
+Compression no
+
+# User restrictions
+AllowUsers loralab
+DenyUsers root
+
+# Connection settings
+ClientAliveInterval 300
+ClientAliveCountMax 2
+TCPKeepAlive yes
+
+# PAM and logging
+UsePAM yes
+Subsystem sftp /usr/lib/openssh/sftp-server -f AUTHPRIV -l INFO
+
+# SFTP chroot (optional: uncomment to restrict to /data)
+# Match User loralab
+#   ChrootDirectory /data
+#   AllowTcpForwarding no
+#   PermitTTY yes
+#   PasswordAuthentication yes
+
+# Kex algorithms (security)
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512
+Ciphers aes256-ctr,aes192-ctr,aes128-ctr
+MACs hmac-sha2-512,hmac-sha2-256
+
+# Logging
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# Host keys
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_rsa_key
