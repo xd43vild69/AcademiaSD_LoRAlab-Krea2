@@ -11,7 +11,10 @@ from datetime import datetime, timedelta
 from secrets import token_hex
 
 
-CREDS_FILE = Path(os.getenv("AUTH_CREDS_FILE", "/data/auth/credentials.json"))
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent.parent
+DEFAULT_CREDS_PATH = PROJECT_ROOT / "credentials.json"
+CREDS_FILE = Path(os.getenv("AUTH_CREDS_FILE", str(DEFAULT_CREDS_PATH)))
 SESSIONS = {}  # {token: {user, exp_time}}
 
 
@@ -49,13 +52,13 @@ def save_users(users: dict) -> None:
     os.replace(tmp_file, CREDS_FILE)
 
 
-def add_user(username: str, password: str, role: str = "user") -> bool:
-    """Agregar nuevo usuario."""
+def add_user(username: str, password: str, role: str = "user", overwrite: bool = True) -> bool:
+    """Agregar o actualizar usuario."""
     if not username or not password:
         return False
     users = load_users()
-    if username in users:
-        return False  # Usuario ya existe
+    if username in users and not overwrite:
+        return False  # Usuario ya existe y no se permite sobrescribir
 
     hash_val, salt = _hash_password(password)
     users[username] = {

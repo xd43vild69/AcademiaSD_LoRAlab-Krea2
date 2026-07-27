@@ -9,22 +9,16 @@ from auth_module import add_user, save_users, load_users
 
 
 def init_default_credentials():
-    """Crear usuario admin por defecto si no existen credenciales."""
+    """Crear o actualizar usuario admin por defecto."""
     admin_user = os.getenv("ADMIN_USER", "admin")
-    admin_pass = os.getenv("ADMIN_PASS", "change_me_now")
-
-    users = load_users()
-    if users:
-        print(f"[OK] Archivo de credenciales ya existe con {len(users)} usuario(s)")
-        return True
+    admin_pass = os.getenv("ADMIN_PASS", "admin")
 
     print(f"[*] Inicializando credenciales por defecto...")
     print(f"    Usuario: {admin_user}")
-    print(f"    Contraseña: {admin_pass}")
 
-    success = add_user(admin_user, admin_pass, role="admin")
+    success = add_user(admin_user, admin_pass, role="admin", overwrite=True)
     if success:
-        print("[OK] Usuario administrador creado")
+        print(f"[OK] Usuario administrador '{admin_user}' configurado correctamente.")
         return True
     else:
         print("[!] Error al crear usuario administrador", file=sys.stderr)

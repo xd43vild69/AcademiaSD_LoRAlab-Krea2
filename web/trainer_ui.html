@@ -607,6 +607,7 @@
             box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
         }
         .edit { right: var(--s2); }
+        .recap { right: 48px; }
 
         .score-badge {
             position: absolute;
@@ -1037,6 +1038,8 @@
                         <button type="button" class="btn btn-sm" onclick="resetThreshold()"
                             title="Reset to automatically calculated threshold">Auto</button>
                         <button type="button" class="btn btn-sm" onclick="saveCurationOverrides()">Save groups</button>
+                        <button type="button" class="btn btn-sm" onclick="openRecaptionModal()"
+                            title="Regenerate captions with AI (Qwen3-VL)">🤖 Recaption Dataset</button>
                     </div>
                 </div>
             </section>
@@ -1310,6 +1313,7 @@
             </div>
             <div class="actions">
                 <button type="button" class="btn btn-primary" onclick="saveCurrentCaption()">Save Caption</button>
+                <button type="button" class="btn" onclick="recaptionSingleImage(currentEditingFilename)">🤖 Recaption (AI)</button>
                 <button type="button" class="btn btn-danger" onclick="deleteCurrentDatasetImage()">Delete Image</button>
                 <button type="button" class="btn" onclick="closeModal()">Close</button>
             </div>
@@ -1373,6 +1377,49 @@
                 <button type="button" class="btn btn-primary" id="btn-execute-replace"
                     onclick="executeBatchReplace()" disabled>Replace Across Entire Dataset</button>
                 <button type="button" class="btn" onclick="closeBatchReplaceModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: recaption masivo con IA (Qwen3-VL) -->
+    <div class="modal" id="recaption-modal" onclick="closeRecaptionModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:560px;">
+            <div class="modal-head">
+                <h3>🤖 Recaption Dataset (AI)</h3>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="closeRecaptionModal()">✕</button>
+            </div>
+
+            <div class="form-group">
+                <label>Target</label>
+                <select id="recap-target" onchange="updateRecaptionLiveStats()">
+                    <option value="below_threshold" selected>Images below curation threshold ("bad" group)</option>
+                    <option value="all">All images in the dataset</option>
+                </select>
+            </div>
+
+            <div class="check-group">
+                <label>
+                    <input type="checkbox" id="recap-detailed">
+                    Detailed caption (2-4 sentences instead of 1)
+                </label>
+                <label>
+                    <input type="checkbox" id="recap-include-trigger" checked>
+                    Include trigger word
+                </label>
+                <label>
+                    <input type="checkbox" id="recap-keep-backup" checked>
+                    Keep backup of previous caption (.txt.bak)
+                </label>
+            </div>
+
+            <div class="info-box" id="recap-live-stats">
+                Calculating affected images...
+            </div>
+
+            <div class="actions">
+                <button type="button" class="btn btn-primary" id="btn-execute-recap"
+                    onclick="executeRecaptionBulk()">Recaption Dataset</button>
+                <button type="button" class="btn" onclick="closeRecaptionModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -2216,12 +2263,14 @@
                     <span class="${dotClass}" title="${dotTitle}"></span>
                     ${scoreBadge}${ovrBadge}
                     <div class="card-btn star${isBase ? ' on' : ''}" title="Use as baseline">★</div>
+                    <div class="card-btn recap" title="Recaption this image with AI (Qwen3-VL)">🤖</div>
                     <div class="card-btn edit" title="Edit caption">✎</div>
                     <div class="img-filename-tag">${safeFile}</div>
                 </div>
                 <div class="caption">${img.caption ? escapeHtml(img.caption) : '<em>No .txt caption</em>'}</div>
             `;
             card.querySelector('.star').onclick = (e) => { e.stopPropagation(); toggleBaseline(img.file); };
+            card.querySelector('.recap').onclick = (e) => { e.stopPropagation(); recaptionSingleImage(img.file); };
             card.querySelector('.edit').onclick = (e) => {
                 e.stopPropagation();
                 openModal(fullUrl(img), img.file, img.caption || '');
@@ -2630,6 +2679,96 @@
                 btnExecute.innerText = '🔄 Replace Across Entire Dataset';
                 btnExecute.disabled = false;
             }
+        }
+
+        // ===================== Recaption con IA (Qwen3-VL) =====================
+        // Lanza scripts/python/recaption_dataset.py por el mismo camino que
+        // curate/precache/train: guardar sidecar JSON (/api/save-recaption) y
+        // luego startScript('recaption') (subprocess + terminal SSE existentes).
+
+        function openRecaptionModal() {
+            const modal = document.getElementById('recaption-modal');
+            modal.classList.add('active');
+            updateRecaptionLiveStats();
+        }
+
+        function closeRecaptionModal(event) {
+            if (!event || event.target === document.getElementById('recaption-modal')) {
+                document.getElementById('recaption-modal').classList.remove('active');
+            }
+        }
+
+        function updateRecaptionLiveStats() {
+            const target = document.getElementById('recap-target').value;
+            const statsDiv = document.getElementById('recap-live-stats');
+            const btnExecute = document.getElementById('btn-execute-recap');
+
+            if (!allDatasetImages || allDatasetImages.length === 0) {
+                statsDiv.innerHTML = '<span style="color:var(--text-muted);">No images loaded.</span>';
+                btnExecute.disabled = true;
+                return;
+            }
+
+            if (target === 'below_threshold' && !curationMeta.available) {
+                statsDiv.innerHTML = '<span style="color:#f87171;">Run Curation (Score) first to use this target.</span>';
+                btnExecute.disabled = true;
+                return;
+            }
+
+            // Mismo cálculo que las cards en curación (groupOf), para que el
+            // contador coincida con lo que se ve marcado "bad" en pantalla.
+            const count = target === 'all'
+                ? allDatasetImages.length
+                : allDatasetImages.filter(img => groupOf(img) === 'bad').length;
+
+            if (count > 0) {
+                statsDiv.innerHTML = `<span style="color:#4ade80; font-weight:600;">✓ ${count}</span> of ${allDatasetImages.length} images will be recaptioned.`;
+                statsDiv.style.borderColor = '#4ade80';
+                btnExecute.disabled = false;
+            } else {
+                statsDiv.innerHTML = `<span style="color:#f87171;">✕ No images match this target.</span>`;
+                statsDiv.style.borderColor = '#f87171';
+                btnExecute.disabled = true;
+            }
+        }
+
+        async function recaptionSingleImage(filename) {
+            if (!filename) return;
+            if (!confirm(`Recaption "${filename}" with AI (Qwen3-VL)?\n\n` +
+                'This overwrites its .txt caption (the previous caption is backed up to .txt.bak).')) {
+                return;
+            }
+            closeModal();
+            await fetch('/api/save-recaption', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target: 'single', filename: filename })
+            });
+            await startScript('recaption');
+            await loadDatasetInfo();
+        }
+
+        async function executeRecaptionBulk() {
+            const target = document.getElementById('recap-target').value;
+            const detailed = document.getElementById('recap-detailed').checked;
+            const includeTrigger = document.getElementById('recap-include-trigger').checked;
+            const keepBackup = document.getElementById('recap-keep-backup').checked;
+            const threshold = effectiveThreshold();
+
+            closeRecaptionModal();
+            await fetch('/api/save-recaption', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    target: target,
+                    threshold: threshold,
+                    detailed: detailed,
+                    include_trigger: includeTrigger,
+                    keep_backup: keepBackup
+                })
+            });
+            await startScript('recaption');
+            await loadDatasetInfo();
         }
 
         document.addEventListener('keydown', function(e) {

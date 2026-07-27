@@ -32,7 +32,11 @@ services:
 
       # Credentials (change before production)
       ADMIN_USER: "${ADMIN_USER:-admin}"
-      ADMIN_PASS: "${ADMIN_PASS:-change_me_now}"
+      ADMIN_PASS: "${ADMIN_PASS:-admin}"
+      # Persiste en el volumen /data/auth en vez del default local
+      # (PROJECT_ROOT/credentials.json), que viviría dentro del contenedor y se
+      # perdería en cada rebuild.
+      AUTH_CREDS_FILE: "/data/auth/credentials.json"
 
       # Paths inside container
       DATASET_PATH: "/data/datasets"

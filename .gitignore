@@ -46,6 +46,8 @@ previews/
 # ==========================================
 pre_cache_settings.json
 train_settings.json
+recaption_settings.json
+credentials.json
 
 # Variables de entorno (pueden contener HF_TOKEN u otras credenciales)
 .env

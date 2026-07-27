@@ -65,7 +65,6 @@ from flask import (
     jsonify,
     request,
     send_from_directory,
-    session,
     make_response
 )
 from functools import wraps
@@ -75,8 +74,11 @@ logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
 # Importar módulos de autenticación (Docker deployment)
 try:
-    from auth_module import authenticate, create_session_token, verify_session_token, add_user
+    from auth_module import authenticate, create_session_token, verify_session_token, add_user, load_users
+    from init_auth import init_default_credentials
     AUTH_ENABLED = True
+    if not load_users():
+        init_default_credentials()
 except ImportError:
     AUTH_ENABLED = False
     print("[!] auth_module no disponible — autenticación deshabilitada (dev mode)")
@@ -112,6 +114,8 @@ CURATE_SCRIPT = BASE_DIR / "0_curate_dataset.py"
 PRECACHE_SCRIPT = BASE_DIR / "1_pre_cache_krea2.py"
 TRAIN_SCRIPT = BASE_DIR / "2_train_lora_krea2.py"
 PROGRESSIVE_SCRIPT = BASE_DIR / "run_progressive.py"
+RECAPTION_SCRIPT = BASE_DIR / "recaption_dataset.py"
+RECAPTION_CONFIG = PROJECT_ROOT / "recaption_settings.json"
 
 # Curaduría: el informe lo escribe 0_curate_dataset.py y se regenera en cada
 # scan; los ajustes manuales (umbral y reasignaciones) viven aparte para que
@@ -141,11 +145,13 @@ IMAGE_MAX_AGE = 31536000           # 1 año: seguro porque la URL está versiona
 
 app = Flask(__name__)
 
-# Configurar sesiones seguras para Docker/HTTPS
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.secret_key = os.urandom(32)  # Secret dinámico por sesión
+# La cookie Secure solo puede marcarse cuando realmente se sirve por HTTPS
+# (certs de /data/certs, vía Docker/producción); en local dev sobre HTTP plano
+# el navegador descarta en silencio cualquier cookie marcada Secure, y el login
+# "funciona" (200 OK) pero la sesión nunca queda guardada.
+USING_HTTPS = Path("/data/certs/cert.pem").exists() and Path("/data/certs/key.pem").exists()
+
+app.secret_key = os.urandom(32)  # No se usa flask.session; queda por si algo interno de Flask lo requiere
 
 # Inicializar rate limiter si está disponible
 if LIMITER_ENABLED:
@@ -240,6 +246,8 @@ def get_script_for_name(script_name):
         return CURATE_SCRIPT
     if script_name == "precache":
         return PRECACHE_SCRIPT
+    if script_name == "recaption":
+        return RECAPTION_SCRIPT
     if script_name == "train":
         # En modo progresivo, el botón Train lanza el orquestador de fases en vez
         # del entrenador único. La decisión sale de la config guardada.
@@ -338,8 +346,10 @@ def login_required(f):
             # Sin autenticación en dev mode
             return f(*args, **kwargs)
 
-        # Verificar token en sesión
-        token = session.get('auth_token')
+        # El token vive en una cookie propia ("auth_token", puesta por login()
+        # vía resp.set_cookie), no en el `session` firmado de Flask — son dos
+        # mecanismos de cookie distintos, así que se lee de request.cookies.
+        token = request.cookies.get('auth_token')
         if not token or not verify_session_token(token):
             return jsonify({"error": "Unauthorized"}), 401
 
@@ -351,7 +361,7 @@ def get_current_user():
     """Obtener username del usuario autenticado, o None."""
     if not AUTH_ENABLED:
         return "admin"
-    token = session.get('auth_token')
+    token = request.cookies.get('auth_token')
     return verify_session_token(token) if token else None
 
 
@@ -375,7 +385,7 @@ def login():
 
     token = create_session_token(username, expiry_minutes=480)
     resp = make_response(jsonify({"status": "ok", "user": username}))
-    resp.set_cookie("auth_token", token, httponly=True, secure=True, samesite="Lax", max_age=480*60)
+    resp.set_cookie("auth_token", token, httponly=True, secure=USING_HTTPS, samesite="Lax", max_age=480*60)
     return resp
 
 
@@ -383,7 +393,7 @@ def login():
 def logout():
     """Logout endpoint: revoca sesión."""
     if AUTH_ENABLED:
-        token = session.get('auth_token')
+        token = request.cookies.get('auth_token')
         if token:
             from auth_module import revoke_session
             revoke_session(token)
@@ -771,6 +781,47 @@ def save_precache():
         write_json_file(TRAIN_CONFIG, train_cfg)
 
         return jsonify({"status": "ok", "file": saved_files[0], "all_saved": saved_files})
+    except Exception as exc:
+        return jsonify({"status": "error", "error": str(exc)}), 500
+
+
+@app.route("/api/save-recaption", methods=["POST"])
+@login_required
+def save_recaption():
+    """Escribe recaption_settings.json, el sidecar que lee recaption_dataset.py.
+
+    A diferencia de save-precache/save-train (que persisten configuración de
+    formulario), esto es la config de UNA acción bajo demanda: se escribe justo
+    antes de lanzar /api/run {script:"recaption"}, no se muestra en ningún form.
+    """
+    try:
+        data = request.get_json(force=True)
+        if not isinstance(data, dict):
+            return jsonify({"status": "error", "error": "JSON object required / Objeto JSON requerido."}), 400
+
+        target = data.get("target", "all")
+        if target not in ("single", "below_threshold", "all"):
+            return jsonify({"status": "error", "error": f"target inválido: {target}"}), 400
+        if target == "single" and not str(data.get("filename", "")).strip():
+            return jsonify({"status": "error", "error": "filename requerido para target=single"}), 400
+
+        precache_cfg = read_json_file(PRECACHE_CONFIG, {})
+        train_cfg = read_json_file(TRAIN_CONFIG, {})
+
+        cfg = {
+            "dataset_path": precache_cfg.get("dataset_path", "./dataset"),
+            "model_id": precache_cfg.get("model_id", "Krea-2-NF4"),
+            "target": target,
+            "filename": str(data.get("filename", "")).strip(),
+            "threshold": data.get("threshold"),
+            "detailed": bool(data.get("detailed", False)),
+            "include_trigger": bool(data.get("include_trigger", True)),
+            "trigger_word": train_cfg.get("trigger_word", "") or precache_cfg.get("trigger_word", ""),
+            "keep_backup": bool(data.get("keep_backup", True)),
+        }
+
+        write_json_file(RECAPTION_CONFIG, cfg)
+        return jsonify({"status": "ok", "file": RECAPTION_CONFIG.name})
     except Exception as exc:
         return jsonify({"status": "error", "error": str(exc)}), 500
 
@@ -1349,19 +1400,17 @@ if __name__ == "__main__":
     print(f"  Base Dir / Carpeta  : {PROJECT_ROOT}")
     print(f"  Python Interpreter  : {sys.executable}")
 
-    # Determinar protocolo y URL según contexto (Docker vs local dev)
+    # Determinar protocolo y URL según contexto (Docker vs local dev). USING_HTTPS
+    # ya se calculó al importar el módulo (mismo flag que decide si la cookie de
+    # sesión lleva Secure), así que ambos nunca pueden quedar desincronizados.
     ssl_context = None
-    cert_file = Path("/data/certs/cert.pem")
-    key_file = Path("/data/certs/key.pem")
     host = os.getenv("SERVER_HOST", "127.0.0.1")
     port = int(os.getenv("SERVER_PORT", "5000"))
 
-    if cert_file.exists() and key_file.exists():
-        # Docker/Producción: usar HTTPS con certificados
-        ssl_context = (str(cert_file), str(key_file))
+    if USING_HTTPS:
+        ssl_context = ("/data/certs/cert.pem", "/data/certs/key.pem")
         protocol = "https"
     else:
-        # Dev mode: HTTP sin SSL
         protocol = "http"
 
     print(f"  URL                 : {protocol}://{host}:{port}")
@@ -1370,7 +1419,7 @@ if __name__ == "__main__":
     print("=" * 70 + "\n")
 
     # Abrir navegador solo en dev local
-    if host == "127.0.0.1" and not cert_file.exists():
+    if host == "127.0.0.1" and not USING_HTTPS:
         threading.Timer(1.2, open_browser).start()
 
     # Lanzar Flask con SSL si existe

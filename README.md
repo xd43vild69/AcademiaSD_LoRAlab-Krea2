@@ -13,10 +13,13 @@ It features an interactive web GUI with real-time VRAM/RAM monitoring, face-iden
 ## ✨ Key Features
 
 - **🌐 Interactive Web Interface**: Sleek dark-mode web GUI built for configuring parameters, inspecting datasets, tracking console logs, and previewing generated step outputs.
-- **👤 Face Identity Dataset Curation (`0_curate_dataset.py`)**:
-  - Pre-training CPU-only face embedding comparison using ArcFace / InsightFace against up to 3 baseline target photos.
-  - Non-destructive dataset weighting: partitions images into high-similarity (`weight_good`) and lower-similarity (`weight_bad`) groups to adjust loss contribution without deleting files.
-  - Interactive UI modal with visual baseline selector, score cutoff sliders, score distribution chart, and standalone CLI support.
+- **🎯 Multi-Criteria Dataset Curation & Priority Weighting (`0_curate_dataset.py`)**:
+  - **4 Specialized Curation Modes**: Supports **Face** (ArcFace identity), **Clothes** (CLIP style), **Body-Type** (pose/shape), and **Tattoo** (zero-shot CLIP prompt anchoring + HSV saliency + caption keyword synergy).
+  - **⭐ High-Priority Baseline Weighting ($1.5\times$)**: Starred baseline images (★) automatically receive a **$1.5\times$ priority loss weight** during training to accelerate learning on target features.
+  - **Non-Destructive Dataset Weighting**: Partitions remaining images into `weight_good` ($1.0\times$) and `weight_bad` ($0.5\times$) groups to modulate loss contribution without deleting files.
+  - **Mode-Specific Baseline Persistence**: Saves independent baseline selections per mode (`face`, `clothes`, `body-type`, `tattoo`).
+  - **Unified vs Split View**: The **Dataset** tab displays a single flat grid for fast inspection, while the **Curation** tab displays quality group splits and loss weights.
+  - **Instant Dark Tooltips**: Space-saving inline tooltips (`ⓘ`) on titles provide instant context without cluttering the screen.
 - **🔄 Session Persistence & Resilient Execution**:
   - Auto-wrapped background `tmux` sessions (`loralab` web server and `loralab-batch` CLI runner) to protect active runs against SSH drops or terminal exits.
   - Centralized multi-process state tracking (`logs/process_state.json`) and isolated per-process log files.
@@ -60,6 +63,10 @@ It features an interactive web GUI with real-time VRAM/RAM monitoring, face-iden
 > ```
 > 
 > Edit `pre_cache_settings.json` and `train_settings.json` to define your dataset location, project name, training parameters, and Hugging Face token.
+>
+> 🔑 **Default Web UI Credentials:**
+> - **Username:** `admin`
+> - **Password:** `admin`
 
 ---
 
