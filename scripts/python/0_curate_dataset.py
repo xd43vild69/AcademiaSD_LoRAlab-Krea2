@@ -136,6 +136,13 @@ class FaceEmbedder:
         return None if emb is None else np.asarray(emb, dtype=np.float32)
 
 
+def _pooled(output):
+    """CLIPModel.get_image_features/get_text_features: en transformers>=5
+    devuelven BaseModelOutputWithPooling con el embedding proyectado en
+    .pooler_output; versiones viejas devolvían el tensor directamente."""
+    return output.pooler_output if hasattr(output, "pooler_output") else output
+
+
 class CLIPEmbedder:
     """Extractor visual + texto usando CLIP en CPU."""
 
@@ -184,10 +191,11 @@ class CLIPEmbedder:
         try:
             inputs = self._processor(images=crop_pil, return_tensors="pt")
             with torch.no_grad():
-                img_feats = self._model.get_image_features(**inputs)
+                img_feats = _pooled(self._model.get_image_features(**inputs))
                 img_feats = img_feats / img_feats.norm(p=2, dim=-1, keepdim=True)
                 img_emb = img_feats.cpu().numpy()[0]
-        except Exception:
+        except Exception as exc:
+            print(f"[!] CLIP embedding falló / CLIP embedding failed: {exc}")
             return None
 
         txt_emb = None
@@ -195,10 +203,11 @@ class CLIPEmbedder:
             try:
                 txt_inputs = self._processor(text=[caption[:77]], return_tensors="pt", padding=True, truncation=True)
                 with torch.no_grad():
-                    txt_feats = self._model.get_text_features(**txt_inputs)
+                    txt_feats = _pooled(self._model.get_text_features(**txt_inputs))
                     txt_feats = txt_feats / txt_feats.norm(p=2, dim=-1, keepdim=True)
                     txt_emb = txt_feats.cpu().numpy()[0]
-            except Exception:
+            except Exception as exc:
+                print(f"[!] CLIP text embedding falló / CLIP text embedding failed: {exc}")
                 txt_emb = None
 
         if txt_emb is not None:
